@@ -8,6 +8,21 @@ export default function GridAdaptativo() {
   const gridWidth = 2000; // Ancho del grid
   const gridHeight = 1000; // Alto del grid
 
+  // Token
+  type Token = {
+    id: string;
+    x: number;
+    y: number;
+    radius: number;
+    color: string; // opcional para identificarlo visualmente
+  };
+
+  // Estado para los tokens
+  const [tokens, setTokens] = useState<Token[]>([]);
+  const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
+  const tokenSize = baseTileSize / 2; // Tamaño del token
+
+
   // Estado para el usuario
   const [paintMode, setPaintMode] = useState(false);
   const [moveMode, setMoveMode] = useState(false);
@@ -25,19 +40,44 @@ export default function GridAdaptativo() {
   const tileSizeH = gridHeight / numRows;
   const tileSize = Math.min(tileSizeW, tileSizeH);
 
-  // ReSize
-  const [circleRadius, setCircleRadius] = useState(tileSize / 2);
 
   // Cambiamos a Map<string, string> para almacenar color por casilla
   const [paintedTiles, setPaintedTiles] = useState<Map<string, string>>(new Map());
   const [isDrawing, setIsDrawing] = useState(false);
 
-  const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
 
   // Estado para color seleccionado
   const [selectedColor, setSelectedColor] = useState("orange");
 
   const posKey = (x: number, y: number) => `${x},${y}`;
+
+  // Funcion para Snapear el tamaño del círculo al tamaño de la casilla
+  const snapToGrid = (x: number, y: number, radius: number) => {
+    const tilesCovered = Math.round((radius * 2) / tileSize);
+    const offset = tilesCovered % 2 === 0 ? 0 : 0.5;
+
+    const snappedX = (Math.floor(x / tileSize) + offset) * tileSize;
+    const snappedY = (Math.floor(y / tileSize) + offset) * tileSize;
+
+    return { x: snappedX, y: snappedY };
+  };
+
+
+
+  // Funcion para agregar tokens
+  const addNewToken = () => {
+    const id = crypto.randomUUID(); // Genera un ID único (compatible con navegadores modernos)
+    const newToken: Token = {
+      id,
+      x: 0.5 * tileSize,
+      y: 0.5 * tileSize,
+      radius: tileSize / 2,
+      color: "red", // Podés cambiar esto más adelante
+    };
+    setTokens(prev => [...prev, newToken]);
+  };
+
+
 
   const paintTile = (x: number, y: number) => {
     if (x < 0 || x >= numCols || y < 0 || y >= numRows) return;
@@ -57,17 +97,28 @@ export default function GridAdaptativo() {
     };
 
   // Movimiento con mouse
-    const handleMouseMovePlayer = (e: any) => {
-    if (!moveMode || !isDraggingPlayer) return;
+  const handleMouseMovePlayer = (e: any) => {
+    if (!moveMode || !isDraggingPlayer || !selectedTokenId) return;
 
-    const mousePos = e.target.getStage().getPointerPosition();
+    const stage = e.target.getStage();
+    const mousePos = stage?.getPointerPosition();
     if (!mousePos) return;
 
-    const x = Math.floor(mousePos.x / tileSize);
-    const y = Math.floor(mousePos.y / tileSize);
+    const selectedToken = tokens.find(t => t.id === selectedTokenId);
+    if (!selectedToken) return;
 
-    setCursorPos({ x, y });
+    const { x, y } = snapToGrid(mousePos.x, mousePos.y, selectedToken.radius);
+
+    const updatedTokens = tokens.map(token =>
+      token.id === selectedTokenId
+        ? { ...token, x, y }
+        : token
+    );
+    setTokens(updatedTokens);
   };
+
+
+
 
 
   // Cambiar paintMode
@@ -108,30 +159,51 @@ export default function GridAdaptativo() {
 
   // Manejo de eventos del teclado para mover el "player"
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      setCursorPos(({ x, y }) => {
-        if (e.key.toLowerCase() === "w") return { x, y: Math.max(0, y - 1) };
-        if (e.key.toLowerCase() === "s") return { x, y: Math.min(numRows - 1, y + 1) };
-        if (e.key.toLowerCase() === "a") return { x: Math.max(0, x - 1), y };
-        if (e.key.toLowerCase() === "d") return { x: Math.min(numCols - 1, x + 1), y };
-        return { x, y };
-      });
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (!selectedTokenId) return;
 
-      // Re escalar el radio del círculo según el tamaño de la casilla
-      // Aumentar el radio del círculo al presionar "r"
-      if (e.key.toLowerCase() === "r") {
-        setCircleRadius((prevRadius) => Math.min(prevRadius + circleRadius, tileSize * 2));
-      }
+    setTokens((prevTokens) =>
+      prevTokens.map((token) => {
+        if (token.id !== selectedTokenId) return token;
 
-      // Disminuir el radio del círculo al presionar "f"
-      if (e.key.toLowerCase() === "f") {
-        setCircleRadius((prevRadius) => Math.max(prevRadius - circleRadius, tileSize / 2));
-      }
 
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [numCols, numRows]);
+        if (selectedTokenId) {
+          if (e.key.toLowerCase() === "r") {
+            setTokens(tokens =>
+              tokens.map(token => {
+                if (token.id === selectedTokenId) {
+                  const newRadius = Math.min(token.radius + tokenSize, tileSize * 2);
+                  const snapped = snapToGrid(token.x, token.y, newRadius);
+                  return { ...token, radius: newRadius, x: snapped.x, y: snapped.y };
+                }
+                return token;
+              })
+            );
+          }
+
+          if (e.key.toLowerCase() === "f") {
+            setTokens(tokens =>
+              tokens.map(token => {
+                if (token.id === selectedTokenId) {
+                  const newRadius = Math.max(token.radius - tokenSize, tileSize / 2);
+                  const snapped = snapToGrid(token.x, token.y, newRadius);
+                  return { ...token, radius: newRadius, x: snapped.x, y: snapped.y };
+                }
+                return token;
+              })
+            );
+          }
+        } // cierre de if selectedTokenId
+
+        return token; // Retorna el token sin cambios si no es el seleccionado
+      })
+    );
+  };
+
+  window.addEventListener("keydown", handleKeyDown);
+  return () => window.removeEventListener("keydown", handleKeyDown);
+}, [selectedTokenId, numCols, numRows, tileSize]);
+
 
   // Paleta básica de colores
   const colors = ["orange", "red", "blue", "green", "yellow", "purple", "black"];
@@ -163,9 +235,6 @@ export default function GridAdaptativo() {
     return lines;
   };
 
-  // calculo el tamaño del círculo según el tamaño de la casilla
-  const tilesCovered = Math.round((circleRadius * 2) / tileSize);
-  const centerOffset = tilesCovered % 2 === 0 ? 0.5 : 0;
 
   return (
     <>
@@ -229,6 +298,20 @@ export default function GridAdaptativo() {
       >
         {moveMode ? "Disable Move Mode" : "Enable Move Mode"}
       </button>
+
+      <button
+        onClick={addNewToken}
+        style={{
+          backgroundColor: "lightgreen",
+          padding: "5px 10px",
+          cursor: "pointer",
+          marginBottom: 10,
+          marginLeft: 10,
+        }}
+      >
+        Agregar Token
+      </button>
+
     
       <Stage
         width={gridWidth}
@@ -267,14 +350,23 @@ export default function GridAdaptativo() {
           {/* Rect cursor */}
 
           {/* Círculo de player */}
-          <Circle
-            x={(cursorPos.x + 0.5 + centerOffset) * tileSize}
-            y={(cursorPos.y + 0.5 + centerOffset) * tileSize}
-            radius={circleRadius}
-            fill="red"
-            onMouseDown={() => {if (moveMode) setIsDraggingPlayer(true);}}
-            stroke={"black"}
-          />
+          {tokens.map((token) => (
+            <Circle
+              key={token.id}
+              x={token.x}
+              y={token.y}
+              radius={token.radius}
+              fill={token.color}
+              stroke={token.id === selectedTokenId ? "black" : undefined}
+              strokeWidth={token.id === selectedTokenId ? 2 : 0}
+              onMouseDown={() => {
+                if (moveMode) {
+                  setSelectedTokenId(token.id);
+                  setIsDraggingPlayer(true);
+                }
+              }}
+            />
+          ))}
         </Layer>
       </Stage>
     </>
