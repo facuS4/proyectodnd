@@ -93,20 +93,28 @@ export default function GridAdaptativo() {
 
   const paintTile = (x: number, y: number) => {
     if (x < 0 || x >= numCols || y < 0 || y >= numRows) return;
+
     setPaintedTiles((prev) => {
       const newMap = new Map(prev);
-      newMap.set(posKey(x, y), selectedColor);
+      const key = posKey(x, y);
+
+      if (selectedColor === "rgb(255, 255, 255)") {
+        newMap.delete(key); // Elimina la casilla si se pinta con blanco
+      } else {
+        newMap.set(key, selectedColor); // Si no es blanco, pinta normalmente
+      }
+
       return newMap;
     });
   };
 
   // Cambiar a moverse con el mouse
-    const toggleMoveMode = () => {
-      setMoveMode((prev) => {
-        if (!prev) setPaintMode(false); // Al activar mover, desactiva pintar
-        return !prev;
-      });
-    };
+  const toggleMoveMode = () => {
+    setMoveMode((prev) => {
+      if (!prev) setPaintMode(false); // Al activar mover, desactiva pintar
+      return !prev;
+    });
+  };
 
   // Movimiento con mouse
   const handleMouseMovePlayer = (e: any) => {
@@ -151,12 +159,12 @@ export default function GridAdaptativo() {
   }
 
   // Cambiar paintMode
-    const togglePaintMode = () => {
-      setPaintMode((prev) => {
-        if (!prev) setMoveMode(false); // Al activar pintar, desactiva mover
-        return !prev;
-      });
-    };
+  const togglePaintMode = () => {
+    setPaintMode((prev) => {
+      if (!prev) setMoveMode(false); // Al activar pintar, desactiva mover
+      return !prev;
+    });
+  };
 
   // Manejo de eventos del mouse
   // para pintar casillas
@@ -171,7 +179,7 @@ export default function GridAdaptativo() {
   };
 
   const handleMouseMove = (e: any) => {
-  // Si no estamos en modo pintura, no hacemos nada
+    // Si no estamos en modo pintura, no hacemos nada
     if (!paintMode) return;
     if (!isDrawing) return;
     const mousePos = e.target.getStage().getPointerPosition();
@@ -188,76 +196,76 @@ export default function GridAdaptativo() {
 
   // Manejo de eventos del teclado para mover el "player"
   useEffect(() => {
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (!selectedTokenId) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!selectedTokenId) return;
 
-    setTokens((prevTokens) =>
-      prevTokens.map((token) => {
-        if (token.id !== selectedTokenId) return token;
+      setTokens((prevTokens) =>
+        prevTokens.map((token) => {
+          if (token.id !== selectedTokenId) return token;
 
 
-        if (selectedTokenId) {
-          if (e.key.toLowerCase() === "r") {
-            setTokens(tokens =>
-              tokens.map(token => {
-                if (token.id === selectedTokenId) {
-                  const newRadius = Math.min(token.radius + tokenSize, tileSize * 2);
-                  const snapped = snapToGrid(token.x, token.y, newRadius);
-                  return { ...token, radius: newRadius, x: snapped.x, y: snapped.y };
-                }
-                return token;
-              })
-            );
-          }
+          if (selectedTokenId) {
+            if (e.key.toLowerCase() === "r") {
+              setTokens(tokens =>
+                tokens.map(token => {
+                  if (token.id === selectedTokenId) {
+                    const newRadius = Math.min(token.radius + tokenSize, tileSize * 2);
+                    const snapped = snapToGrid(token.x, token.y, newRadius);
+                    return { ...token, radius: newRadius, x: snapped.x, y: snapped.y };
+                  }
+                  return token;
+                })
+              );
+            }
 
-          if (e.key.toLowerCase() === "f") {
-            setTokens(tokens =>
-              tokens.map(token => {
-                if (token.id === selectedTokenId) {
-                  const newRadius = Math.max(token.radius - tokenSize, tileSize / 2);
-                  const snapped = snapToGrid(token.x, token.y, newRadius);
-                  return { ...token, radius: newRadius, x: snapped.x, y: snapped.y };
-                }
-                return token;
-              })
-            );
-          }
-        } // cierre de if selectedTokenId
+            if (e.key.toLowerCase() === "f") {
+              setTokens(tokens =>
+                tokens.map(token => {
+                  if (token.id === selectedTokenId) {
+                    const newRadius = Math.max(token.radius - tokenSize, tileSize / 2);
+                    const snapped = snapToGrid(token.x, token.y, newRadius);
+                    return { ...token, radius: newRadius, x: snapped.x, y: snapped.y };
+                  }
+                  return token;
+                })
+              );
+            }
+          } // cierre de if selectedTokenId
 
-        return token; // Retorna el token sin cambios si no es el seleccionado
-      })
-    );
-  };
+          return token; // Retorna el token sin cambios si no es el seleccionado
+        })
+      );
+    };
 
-  window.addEventListener("keydown", handleKeyDown);
-  return () => window.removeEventListener("keydown", handleKeyDown);
-}, [selectedTokenId, numCols, numRows, tileSize]);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedTokenId, numCols, numRows, tileSize]);
 
 
   // Paleta básica de colores
   const [colors, setColors] = useState([
-  "rgb(255, 255, 255)",  // white
-  "rgb(0, 0, 0)",        // black
-  "rgb(255, 76, 76)",   // light red
-  "rgb(255, 0, 0)",     // red
-  "rgb(178, 0, 0)",     // dark red
-  "rgb(255, 255, 76)",  // ight yellow
-  "rgb(255, 255, 0)",   // yellow
-  "rgb(178, 178, 0)",   // dark yellow
-  "rgb(76, 76, 255)",   // light blue
-  "rgb(0, 0, 255)",     // blue
-  "rgb(0, 0, 178)",     // dark blue
-  "rgb(76, 166, 76)",   // light green
-  "rgb(0, 128, 0)",     // green
-  "rgb(0, 89, 0)",      // dark green
-  "rgb(255, 190, 76)",  // light orange
-  "rgb(255, 165, 0)",   // orange
-  "rgb(178, 115, 0)",   // dark orange
-  "rgb(166, 76, 166)",  // light purple
-  "rgb(128, 0, 128)",   // purple
-  "rgb(89, 0, 89)",     // dark purple
-  
-]);
+    "rgb(255, 255, 255)",  // white
+    "rgb(0, 0, 0)",        // black
+    "rgb(255, 76, 76)",   // light red
+    "rgb(255, 0, 0)",     // red
+    "rgb(178, 0, 0)",     // dark red
+    "rgb(255, 255, 76)",  // ight yellow
+    "rgb(255, 255, 0)",   // yellow
+    "rgb(178, 178, 0)",   // dark yellow
+    "rgb(76, 76, 255)",   // light blue
+    "rgb(0, 0, 255)",     // blue
+    "rgb(0, 0, 178)",     // dark blue
+    "rgb(76, 166, 76)",   // light green
+    "rgb(0, 128, 0)",     // green
+    "rgb(0, 89, 0)",      // dark green
+    "rgb(255, 190, 76)",  // light orange
+    "rgb(255, 165, 0)",   // orange
+    "rgb(178, 115, 0)",   // dark orange
+    "rgb(166, 76, 166)",  // light purple
+    "rgb(128, 0, 128)",   // purple
+    "rgb(89, 0, 89)",     // dark purple
+
+  ]);
 
 
   const drawGrid = () => {
@@ -382,7 +390,7 @@ export default function GridAdaptativo() {
         Agregar Token
       </button>
 
-    
+
       <Stage
         width={gridWidth}
         height={gridHeight}
@@ -398,7 +406,7 @@ export default function GridAdaptativo() {
         style={{ background: "#ffffff" }}
         tabIndex={0}
       >
-        
+
         <Layer>
           {drawGrid()}
           {/* Casillas pintadas con color */}
