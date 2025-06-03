@@ -1,5 +1,5 @@
 import { Stage, Layer, Rect, Line } from "react-konva";
-import { useState, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Circle } from "react-konva";
 
 export default function GridAdaptativo() {
@@ -45,11 +45,25 @@ export default function GridAdaptativo() {
   const [paintedTiles, setPaintedTiles] = useState<Map<string, string>>(new Map());
   const [isDrawing, setIsDrawing] = useState(false);
 
-
-  // Estado para color seleccionado
+  // refs para cada input color
   const [selectedColor, setSelectedColor] = useState("orange");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [pickerIndex, setPickerIndex] = useState<number | null>(null);
+  const [pickerStyle, setPickerStyle] = useState({ top: 0, left: 0, visibility: "hidden" as "hidden" | "visible" });
 
   const posKey = (x: number, y: number) => `${x},${y}`;
+
+  const handleContextMenu = (e: React.MouseEvent, index: number) => {
+    e.preventDefault();
+    const x = e.clientX;
+    const y = e.clientY;
+    setPickerIndex(index);
+    setPickerStyle({ left: x, top: y, visibility: "visible" });
+
+    setTimeout(() => {
+      inputRef.current?.click();
+    }, 0);
+  };
 
   // Funcion para Snapear el tamaño del círculo al tamaño de la casilla
   const snapToGrid = (x: number, y: number, radius: number) => {
@@ -61,8 +75,6 @@ export default function GridAdaptativo() {
 
     return { x: snappedX, y: snappedY };
   };
-
-
 
   // Funcion para agregar tokens
   const addNewToken = () => {
@@ -118,8 +130,25 @@ export default function GridAdaptativo() {
   };
 
 
+  //Funcion para cambiar de color
+  const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (pickerIndex === null) return;
+    const newColors = [...colors];
+    newColors[pickerIndex] = e.target.value;
+    setColors(newColors);
+    setPickerIndex(null);
+    setPickerStyle({ ...pickerStyle, visibility: "hidden" });
+  };
 
-
+  //transformar de hex a rgb
+  function rgbToHex(rgb: string): string {
+    const result = /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/.exec(rgb);
+    if (!result) return "#000000";
+    const r = parseInt(result[1]).toString(16).padStart(2, "0");
+    const g = parseInt(result[2]).toString(16).padStart(2, "0");
+    const b = parseInt(result[3]).toString(16).padStart(2, "0");
+    return `#${r}${g}${b}`;
+  }
 
   // Cambiar paintMode
     const togglePaintMode = () => {
@@ -206,7 +235,29 @@ export default function GridAdaptativo() {
 
 
   // Paleta básica de colores
-  const colors = ["orange", "red", "blue", "green", "yellow", "purple", "black"];
+  const [colors, setColors] = useState([
+  "rgb(255, 255, 255)",  // white
+  "rgb(0, 0, 0)",        // black
+  "rgb(255, 76, 76)",   // light red
+  "rgb(255, 0, 0)",     // red
+  "rgb(178, 0, 0)",     // dark red
+  "rgb(255, 255, 76)",  // ight yellow
+  "rgb(255, 255, 0)",   // yellow
+  "rgb(178, 178, 0)",   // dark yellow
+  "rgb(76, 76, 255)",   // light blue
+  "rgb(0, 0, 255)",     // blue
+  "rgb(0, 0, 178)",     // dark blue
+  "rgb(76, 166, 76)",   // light green
+  "rgb(0, 128, 0)",     // green
+  "rgb(0, 89, 0)",      // dark green
+  "rgb(255, 190, 76)",  // light orange
+  "rgb(255, 165, 0)",   // orange
+  "rgb(178, 115, 0)",   // dark orange
+  "rgb(166, 76, 166)",  // light purple
+  "rgb(128, 0, 128)",   // purple
+  "rgb(89, 0, 89)",     // dark purple
+  
+]);
 
 
   const drawGrid = () => {
@@ -240,10 +291,11 @@ export default function GridAdaptativo() {
     <>
       {/* Paleta */}
       <div style={{ marginBottom: 10 }}>
-        {colors.map((color) => (
+        {colors.map((color, index) => (
           <button
-            key={color}
+            key={index}
             onClick={() => setSelectedColor(color)}
+            onContextMenu={(e) => handleContextMenu(e, index)}
             style={{
               backgroundColor: color,
               border: selectedColor === color ? "3px solid black" : "1px solid gray",
@@ -257,6 +309,24 @@ export default function GridAdaptativo() {
         ))}
       </div>
 
+      {/* Picker oculto pero posicionado */}
+      <input
+        ref={inputRef}
+        type="color"
+        style={{
+          position: "fixed",
+          zIndex: 1000,
+          left: pickerStyle.left,
+          top: pickerStyle.top,
+          opacity: 0,
+          width: 30,
+          height: 30,
+          border: "none",
+          visibility: pickerStyle.visibility,
+        }}
+        value={pickerIndex !== null ? rgbToHex(colors[pickerIndex]) : "#ffffff"}
+        onChange={handleColorChange}
+      />
 
       <input
         type="file"
