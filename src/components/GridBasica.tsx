@@ -1,6 +1,7 @@
 import { Stage, Layer, Rect, Line } from "react-konva";
 import { useRef, useState, useEffect } from "react";
-import { Circle, Text } from "react-konva";
+import { Circle, Text, Image } from "react-konva";
+import CircularToken from "./CircularTokenProps";
 
 export default function GridAdaptativo() {
   const baseTileSize = 50; // Tamaño base de la casilla
@@ -17,6 +18,7 @@ export default function GridAdaptativo() {
     color: string; // opcional para identificarlo visualmente
     nombre: string;
     vida: string;
+    image?: HTMLImageElement | null;
   };
 
   // Estado para los tokens
@@ -35,8 +37,8 @@ export default function GridAdaptativo() {
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const [contextTokenId, setContextTokenId] = useState<string | null>(null);
 
-  // Estado para la imagen del jugador
-  const [playerImage, setPlayerImage] = useState<HTMLImageElement | null>(null);
+  // Estado para la imagen del fondo
+  const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
 
   // Calculamos el número de columnas y filas basado en el tamaño del grid y el tamaño de la casilla
   const numCols = Math.floor(gridWidth / baseTileSize);
@@ -104,6 +106,7 @@ export default function GridAdaptativo() {
       color: "red", // Podés cambiar esto más adelante
       nombre: "",
       vida: "",
+      image: null,
     };
     setTokens(prev => [...prev, newToken]);
   };
@@ -159,11 +162,11 @@ export default function GridAdaptativo() {
 
   //Funcion para cambiar de color
   const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  if (pickerIndex === null) return;
-  const newColors = [...colors];
-  newColors[pickerIndex] = hexToRgb(e.target.value); // Convertimos HEX a RGB
-  setColors(newColors);
-};
+    if (pickerIndex === null) return;
+    const newColors = [...colors];
+    newColors[pickerIndex] = hexToRgb(e.target.value); // Convertimos HEX a RGB
+    setColors(newColors);
+  };
 
   //transformar de hex a rgb
   function rgbToHex(rgb: string): string {
@@ -375,7 +378,23 @@ export default function GridAdaptativo() {
             const img = new window.Image();
             img.src = URL.createObjectURL(file);
             img.onload = () => {
-              setPlayerImage(img);
+              // Crear un canvas auxiliar para rotar la imagen
+              const canvas = document.createElement("canvas");
+              canvas.width = img.height;
+              canvas.height = img.width;
+              const ctx = canvas.getContext("2d");
+
+              if (ctx) {
+                ctx.translate(canvas.width / 2, canvas.height / 2);
+                ctx.rotate(-Math.PI / 2); // rotar 90° antihorario
+                ctx.drawImage(img, -img.width / 2, -img.height / 2);
+              }
+
+              const rotatedImg = new window.Image();
+              rotatedImg.src = canvas.toDataURL();
+              rotatedImg.onload = () => {
+                setBackgroundImage(rotatedImg); // establecer la imagen ya rotada
+              };
             };
           }
         }}
@@ -438,6 +457,16 @@ export default function GridAdaptativo() {
       >
 
         <Layer>
+          {backgroundImage && (
+            <Image
+              image={backgroundImage}
+              x={(gridWidth - backgroundImage.width) / 2}
+              y={(gridHeight - backgroundImage.height) / 2}
+              width={backgroundImage.width}
+              height={backgroundImage.height}
+            />
+          )}
+
           {drawGrid()}
           {/* Casillas pintadas con color */}
           {[...paintedTiles.entries()].map(([key, color]) => {
@@ -472,28 +501,50 @@ export default function GridAdaptativo() {
                 fill="black"
               />
 
-              {/* Token */}
-              <Circle
-                key={token.id}
-                x={token.x}
-                y={token.y}
-                radius={token.radius}
-                fill={token.color}
-                stroke={token.id === selectedTokenId ? "black" : undefined}
-                strokeWidth={token.id === selectedTokenId ? 2 : 0}
-                onMouseDown={() => {
-                  if (moveMode) {
-                    setSelectedTokenId(token.id);
-                    setIsDraggingPlayer(true);
-                  }
-                }}
-                onContextMenu={(e) => {
-                  e.evt.preventDefault();
-                  setContextTokenId(token.id);
-                  setContextMenuPosition({ x: e.evt.clientX, y: e.evt.clientY });
-                  setContextMenuVisible(true);
-                }}
-              />
+              {/* Token: Imagen si hay, sino círculo */}
+              {token.image ? (
+                <CircularToken
+                  key={token.id}
+                  image={token.image}
+                  x={token.x}
+                  y={token.y}
+                  radius={token.radius}
+                  onMouseDown={() => {
+                    if (moveMode) {
+                      setSelectedTokenId(token.id);
+                      setIsDraggingPlayer(true);
+                    }
+                  }}
+                  onContextMenu={(e) => {
+                    e.evt.preventDefault();
+                    setContextTokenId(token.id);
+                    setContextMenuPosition({ x: e.evt.clientX, y: e.evt.clientY });
+                    setContextMenuVisible(true);
+                  }}
+                />
+              ) : (
+                <Circle
+                  key={token.id}
+                  x={token.x}
+                  y={token.y}
+                  radius={token.radius}
+                  fill={token.color}
+                  stroke={token.id === selectedTokenId ? "black" : undefined}
+                  strokeWidth={token.id === selectedTokenId ? 2 : 0}
+                  onMouseDown={() => {
+                    if (moveMode) {
+                      setSelectedTokenId(token.id);
+                      setIsDraggingPlayer(true);
+                    }
+                  }}
+                  onContextMenu={(e) => {
+                    e.evt.preventDefault();
+                    setContextTokenId(token.id);
+                    setContextMenuPosition({ x: e.evt.clientX, y: e.evt.clientY });
+                    setContextMenuVisible(true);
+                  }}
+                />
+              )}
 
               {/* Nombre abajo */}
               <Text
@@ -514,68 +565,89 @@ export default function GridAdaptativo() {
 
       {contextMenuVisible && contextTokenId && (
         <div
-  style={{
-    position: "fixed",
-    top: contextMenuPosition.y,
-    left: contextMenuPosition.x,
-    backgroundColor: "white",
-    border: "1px solid #ccc",
-    boxShadow: "0 2px 5px rgba(0,0,0,0.2)",
-    zIndex: 1000,
-    padding: 8,
-  }}
-  onContextMenu={(e) => e.preventDefault()}
-  onClick={(e) => e.stopPropagation()}
->
-  <label style={{ fontSize: 14 }}>Color:</label>
-  <input
-    type="color"
-    value={
-      contextTokenId
-        ? rgbToHex(tokens.find((t) => t.id === contextTokenId)?.color || "rgb(0, 0, 0)")
-        : "#000000"
-    }
-    onChange={(e) => {
-      const newColor = hexToRgb(e.target.value);
-      setTokens((tokens) =>
-        tokens.map((t) =>
-          t.id === contextTokenId ? { ...t, color: newColor } : t
-        )
-      );
-    }}
-    style={{ display: "block", marginBottom: 8 }}
-  />
+          style={{
+            position: "fixed",
+            top: contextMenuPosition.y,
+            left: contextMenuPosition.x,
+            backgroundColor: "white",
+            border: "1px solid #ccc",
+            boxShadow: "0 2px 5px rgba(0,0,0,0.2)",
+            zIndex: 1000,
+            padding: 8,
+          }}
+          onContextMenu={(e) => e.preventDefault()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <label style={{ fontSize: 14 }}>Color:</label>
+          <input
+            type="color"
+            value={
+              contextTokenId
+                ? rgbToHex(tokens.find((t) => t.id === contextTokenId)?.color || "rgb(0, 0, 0)")
+                : "#000000"
+            }
+            onChange={(e) => {
+              const newColor = hexToRgb(e.target.value);
+              setTokens((tokens) =>
+                tokens.map((t) =>
+                  t.id === contextTokenId ? { ...t, color: newColor } : t
+                )
+              );
+            }}
+            style={{ display: "block", marginBottom: 8 }}
+          />
 
-  <label>Nombre:</label>
-  <input
-    type="text"
-    value={tokens.find((t) => t.id === contextTokenId)?.nombre || ""}
-    onChange={(e) => {
-      const value = e.target.value;
-      setTokens((tokens) =>
-        tokens.map((t) =>
-          t.id === contextTokenId ? { ...t, nombre: value } : t
-        )
-      );
-    }}
-    style={{ display: "block", marginBottom: 8, width: "100%" }}
-  />
+          <label>Nombre:</label>
+          <input
+            type="text"
+            value={tokens.find((t) => t.id === contextTokenId)?.nombre || ""}
+            onChange={(e) => {
+              const value = e.target.value;
+              setTokens((tokens) =>
+                tokens.map((t) =>
+                  t.id === contextTokenId ? { ...t, nombre: value } : t
+                )
+              );
+            }}
+            style={{ display: "block", marginBottom: 8, width: "100%" }}
+          />
 
-  <label>Vida:</label>
-  <input
-    type="text"
-    value={tokens.find((t) => t.id === contextTokenId)?.vida || ""}
-    onChange={(e) => {
-      const value = e.target.value;
-      setTokens((tokens) =>
-        tokens.map((t) =>
-          t.id === contextTokenId ? { ...t, vida: value } : t
-        )
-      );
-    }}
-    style={{ display: "block", width: "100%" }}
-  />
-</div>
+          <label>Vida:</label>
+          <input
+            type="text"
+            value={tokens.find((t) => t.id === contextTokenId)?.vida || ""}
+            onChange={(e) => {
+              const value = e.target.value;
+              setTokens((tokens) =>
+                tokens.map((t) =>
+                  t.id === contextTokenId ? { ...t, vida: value } : t
+                )
+              );
+            }}
+            style={{ display: "block", width: "100%" }}
+          />
+
+          <label>Imagen:</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file || !contextTokenId) return;
+
+              const img = new window.Image();
+              img.src = URL.createObjectURL(file);
+              img.onload = () => {
+                setTokens((tokens) =>
+                  tokens.map((t) =>
+                    t.id === contextTokenId ? { ...t, image: img } : t
+                  )
+                );
+              };
+            }}
+            style={{ display: "block", marginBottom: 8 }}
+          />
+        </div>
 
       )}
       <button
