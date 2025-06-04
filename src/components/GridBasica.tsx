@@ -3,6 +3,7 @@ import { useRef, useState, useEffect } from "react";
 import { Circle, Text, Image } from "react-konva";
 import CircularToken from "./CircularTokenProps";
 import AudioPanel from "./AudioPanel";
+import  {DiceRoller} from "./diceroller";
 
 export default function GridAdaptativo() {
   const baseTileSize = 50; // Tamaño base de la casilla
@@ -654,21 +655,7 @@ export default function GridAdaptativo() {
         </div>
 
       )}
-      <button
-        onClick={() => {
-          setContextMenuVisible(false);
-          setContextTokenId(null);
-        }}
-        style={{
-          marginTop: 8,
-          padding: "4px 8px",
-          backgroundColor: "#eee",
-          border: "1px solid #aaa",
-          cursor: "pointer",
-        }}
-      >
-        Cerrar
-      </button>
+      <DiceRoller></DiceRoller>
     </>
   );
 }
