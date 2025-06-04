@@ -157,10 +157,8 @@ export default function GridAdaptativo() {
   const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (pickerIndex === null) return;
     const newColors = [...colors];
-    newColors[pickerIndex] = e.target.value;
+    newColors[pickerIndex] = hexToRgb(e.target.value); // Convertir a RGB
     setColors(newColors);
-    setPickerIndex(null);
-    setPickerStyle({ ...pickerStyle, visibility: "hidden" });
   };
 
   //transformar de hex a rgb
@@ -358,6 +356,10 @@ export default function GridAdaptativo() {
         }}
         value={pickerIndex !== null ? rgbToHex(colors[pickerIndex]) : "#ffffff"}
         onChange={handleColorChange}
+        onBlur={() => {
+          setPickerIndex(null);
+          setPickerStyle((prev) => ({ ...prev, visibility: "hidden" }));
+        }}
       />
 
       <input
