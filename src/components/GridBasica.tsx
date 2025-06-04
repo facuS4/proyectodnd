@@ -28,6 +28,10 @@ export default function GridAdaptativo() {
   const [moveMode, setMoveMode] = useState(false);
   const [isDraggingPlayer, setIsDraggingPlayer] = useState(false);
 
+  //Cambiar cosas del token
+  const [contextMenuVisible, setContextMenuVisible] = useState(false);
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+  const [contextTokenId, setContextTokenId] = useState<string | null>(null);
 
   // Estado para la imagen del jugador
   const [playerImage, setPlayerImage] = useState<HTMLImageElement | null>(null);
@@ -64,6 +68,17 @@ export default function GridAdaptativo() {
       inputRef.current?.click();
     }, 0);
   };
+
+  //cerrar el menú del token
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setContextMenuVisible(false);
+      setContextTokenId(null);
+    };
+
+    window.addEventListener("click", handleClickOutside);
+    return () => window.removeEventListener("click", handleClickOutside);
+  }, []);
 
   // Funcion para Snapear el tamaño del círculo al tamaño de la casilla
   const snapToGrid = (x: number, y: number, radius: number) => {
@@ -156,6 +171,15 @@ export default function GridAdaptativo() {
     const g = parseInt(result[2]).toString(16).padStart(2, "0");
     const b = parseInt(result[3]).toString(16).padStart(2, "0");
     return `#${r}${g}${b}`;
+  }
+
+  function hexToRgb(hex: string): string {
+    const parsedHex = hex.replace("#", "");
+    const bigint = parseInt(parsedHex, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return `rgb(${r}, ${g}, ${b})`;
   }
 
   // Cambiar paintMode
@@ -443,10 +467,66 @@ export default function GridAdaptativo() {
                   setIsDraggingPlayer(true);
                 }
               }}
+              onContextMenu={(e) => {
+                e.evt.preventDefault(); // Evita el menú por defecto del navegador
+                setContextTokenId(token.id);
+                setContextMenuPosition({ x: e.evt.clientX, y: e.evt.clientY });
+                setContextMenuVisible(true);
+              }}
             />
           ))}
         </Layer>
       </Stage>
+
+      {contextMenuVisible && contextTokenId && (
+        <div
+          style={{
+            position: "fixed",
+            top: contextMenuPosition.y,
+            left: contextMenuPosition.x,
+            backgroundColor: "white",
+            border: "1px solid #ccc",
+            boxShadow: "0 2px 5px rgba(0,0,0,0.2)",
+            zIndex: 1000,
+            padding: 8,
+          }}
+          onContextMenu={(e) => e.preventDefault()}
+          onClick={(e) => e.stopPropagation()} // <- esto evita que se cierre al cambiar color
+        >
+          <label style={{ fontSize: 14 }}>Cambiar color:</label>
+          <input
+            type="color"
+            value={
+              contextTokenId
+                ? rgbToHex(tokens.find((t) => t.id === contextTokenId)?.color || "rgb(0, 0, 0)")
+                : "#000000"
+            }
+            onChange={(e) => {
+              const newColor = hexToRgb(e.target.value);
+              setTokens((tokens) =>
+                tokens.map((t) =>
+                  t.id === contextTokenId ? { ...t, color: newColor } : t
+                )
+              );
+            }}
+          />
+        </div>
+      )}
+      <button
+        onClick={() => {
+          setContextMenuVisible(false);
+          setContextTokenId(null);
+        }}
+        style={{
+          marginTop: 8,
+          padding: "4px 8px",
+          backgroundColor: "#eee",
+          border: "1px solid #aaa",
+          cursor: "pointer",
+        }}
+      >
+        Cerrar
+      </button>
     </>
   );
 }
