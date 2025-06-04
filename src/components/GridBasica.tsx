@@ -2,6 +2,7 @@ import { Stage, Layer, Rect, Line } from "react-konva";
 import { useRef, useState, useEffect } from "react";
 import { Circle, Text, Image } from "react-konva";
 import CircularToken from "./CircularTokenProps";
+import AudioPanel from "./AudioPanel";
 
 export default function GridAdaptativo() {
   const baseTileSize = 50; // Tamaño base de la casilla
@@ -401,12 +402,15 @@ export default function GridAdaptativo() {
         style={{ marginBottom: 10 }}
       />
 
+      <AudioPanel></AudioPanel>
+
       <button
         onClick={togglePaintMode}
         style={{
           backgroundColor: paintMode ? "lightblue" : "lightgray",
           padding: "5px 10px",
           cursor: "pointer",
+          marginLeft: 10,
         }}
         aria-label={paintMode ? "Disable paint mode" : "Enable paint mode"}
       >
