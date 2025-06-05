@@ -39,14 +39,11 @@ export default function GridAdaptativo() {
   const [paintMode, setPaintMode] = useState(false);
   const [moveMode, setMoveMode] = useState(false);
   const [isDraggingPlayer, setIsDraggingPlayer] = useState(false);
-  const [linePaintMode, setLinePaintMode] = useState(false);
-const [paintedLines, setPaintedLines] = useState<Set<string>>(new Set());
 
   //Estados regla
   const [measureMode, setMeasureMode] = useState(false);
   const [measureStart, setMeasureStart] = useState<{ x: number; y: number } | null>(null);
   const [measureEnd, setMeasureEnd] = useState<{ x: number; y: number } | null>(null);
-
 
   //Cambiar cosas del token
   const [contextMenuVisible, setContextMenuVisible] = useState(false);
@@ -64,6 +61,10 @@ const [paintedLines, setPaintedLines] = useState<Set<string>>(new Set());
   const tileSizeH = gridHeight / numRows;
   const tileSize = Math.min(tileSizeW, tileSizeH);
 
+  //Pintar lineas
+  const [paintedEdges, setPaintedEdges] = useState<Map<string, string>>(new Map());
+  const [paintEdgesMode, setPaintEdgesMode] = useState(false);
+  const [isDrawingEdge, setIsDrawingEdge] = useState(false);
 
   // Cambiamos a Map<string, string> para almacenar color por casilla
   const [paintedTiles, setPaintedTiles] = useState<Map<string, string>>(new Map());
@@ -336,7 +337,43 @@ const [paintedLines, setPaintedLines] = useState<Set<string>>(new Set());
       return;
     }
 
+    if (paintEdgesMode) {
+      const mousePos = e.target.getStage().getPointerPosition();
+      if (!mousePos) return;
+
+      const x = Math.floor(mousePos.x / tileSize);
+      const y = Math.floor(mousePos.y / tileSize);
+      const localX = mousePos.x % tileSize;
+      const localY = mousePos.y % tileSize;
+
+      const margin = 6;
+      let edge = null;
+
+      if (localY < margin) edge = "top";
+      else if (localY > tileSize - margin) edge = "bottom";
+      else if (localX < margin) edge = "left";
+      else if (localX > tileSize - margin) edge = "right";
+
+      if (edge) {
+        const key = `${x},${y}-${edge}`;
+        setPaintedEdges((prev) => {
+          const newMap = new Map(prev);
+          if (selectedColor === "rgb(255, 255, 255)") {
+            newMap.delete(key);
+          } else {
+            newMap.set(key, selectedColor);
+          }
+          return newMap;
+        });
+      }
+
+      setIsDrawingEdge(true); // ✅ Empezamos a pintar
+      return;
+    }
+
+
     if (!paintMode) return;
+
     setIsDrawing(true);
     const mousePos = e.target.getStage().getPointerPosition();
     if (!mousePos) return;
@@ -350,6 +387,39 @@ const [paintedLines, setPaintedLines] = useState<Set<string>>(new Set());
   };
 
   const handleMouseMove = (e: any) => {
+    if (paintEdgesMode && isDrawingEdge) {
+      const mousePos = e.target.getStage().getPointerPosition();
+      if (!mousePos) return;
+
+      const x = Math.floor(mousePos.x / tileSize);
+      const y = Math.floor(mousePos.y / tileSize);
+      const localX = mousePos.x % tileSize;
+      const localY = mousePos.y % tileSize;
+
+      const margin = 6;
+      let edge = null;
+
+      if (localY < margin) edge = "top";
+      else if (localY > tileSize - margin) edge = "bottom";
+      else if (localX < margin) edge = "left";
+      else if (localX > tileSize - margin) edge = "right";
+
+      if (edge) {
+        const key = `${x},${y}-${edge}`;
+        setPaintedEdges((prev) => {
+          const newMap = new Map(prev);
+          if (selectedColor === "rgb(255, 255, 255)") {
+            newMap.delete(key); // 🧽 Borrar línea si es blanco
+          } else {
+            newMap.set(key, selectedColor); // 🎨 Pintar línea
+          }
+          return newMap;
+        });
+      }
+
+      return;
+    }
+
     if (moveMode && isShiftDown && selectionStart) {
       const stage = e.target.getStage();
       const pos = stage?.getPointerPosition();
@@ -393,6 +463,10 @@ const [paintedLines, setPaintedLines] = useState<Set<string>>(new Set());
   };
 
   const handleMouseUp = () => {
+    if (paintEdgesMode) {
+      setIsDrawingEdge(false);
+    }
+
     if (moveMode && isShiftDown && selectionRect) {
       const selected = tokens.filter(token => {
         const tokenLeft = token.x - token.radius;
@@ -414,12 +488,13 @@ const [paintedLines, setPaintedLines] = useState<Set<string>>(new Set());
     }
 
     setIsDrawing(false);
+
     if (measureMode && measureStart && measureEnd) {
-      // Mantiene la línea dibujada o limpia si preferís
       setMeasureStart(null);
       setMeasureEnd(null);
       return;
     }
+
     setRectPaintStart(null);
   };
 
@@ -618,6 +693,27 @@ const [paintedLines, setPaintedLines] = useState<Set<string>>(new Set());
       </button>
 
       <button
+        onClick={() => {
+          setPaintEdgesMode((prev) => {
+            if (!prev) {
+              setPaintMode(false);
+              setMoveMode(false);
+              setMeasureMode(false);
+              setAreaMode(false);
+            }
+            return !prev;
+          });
+        }}
+        style={{
+          backgroundColor: paintEdgesMode ? "lightblue" : "lightgray",
+          padding: "5px 10px",
+          marginLeft: 10,
+        }}
+      >
+        {paintEdgesMode ? "Desactivar Pintar Bordes" : "Pintar Bordes"}
+      </button>
+
+      <button
         onClick={toggleMoveMode}
         style={{
           backgroundColor: moveMode ? "lightblue" : "lightgray",
@@ -764,6 +860,40 @@ const [paintedLines, setPaintedLines] = useState<Set<string>>(new Set());
                 height={tileSize}
                 fill={color}
                 opacity={0.8}
+              />
+            );
+          })}
+
+          {/* Pintar Lineas */}
+          {[...paintedEdges.entries()].map(([key, color]) => {
+            const [cell, edge] = key.split("-");
+            const [x, y] = cell.split(",").map(Number);
+
+            let points: number[] = [];
+            const startX = x * tileSize;
+            const startY = y * tileSize;
+
+            switch (edge) {
+              case "top":
+                points = [startX, startY, startX + tileSize, startY];
+                break;
+              case "bottom":
+                points = [startX, startY + tileSize, startX + tileSize, startY + tileSize];
+                break;
+              case "left":
+                points = [startX, startY, startX, startY + tileSize];
+                break;
+              case "right":
+                points = [startX + tileSize, startY, startX + tileSize, startY + tileSize];
+                break;
+            }
+
+            return (
+              <Line
+                key={key}
+                points={points}
+                stroke={color}
+                strokeWidth={4}
               />
             );
           })}
