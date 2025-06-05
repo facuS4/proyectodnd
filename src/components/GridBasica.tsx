@@ -1,9 +1,10 @@
 import { Stage, Layer, Rect, Line } from "react-konva";
 import { useRef, useState, useEffect } from "react";
-import { Circle, Text, Image } from "react-konva";
+import { Circle, Text, Image, Transformer } from "react-konva";
 import CircularToken from "./CircularTokenProps";
 import AudioPanel from "./AudioPanel";
 import { DiceRoller } from "./diceroller";
+import React from "react";
 
 export default function GridAdaptativo() {
   const baseTileSize = 50; // Tamaño base de la casilla
@@ -68,6 +69,59 @@ export default function GridAdaptativo() {
   const [pickerStyle, setPickerStyle] = useState({ top: 0, left: 0, visibility: "hidden" as "hidden" | "visible" });
 
   const posKey = (x: number, y: number) => `${x},${y}`;
+
+  //AREAS
+  const transformerRef = useRef<any>(null);
+  const shapeRefs = useRef<Map<string, any>>(new Map());
+
+  type AreaShape = {
+    id: string;
+    x: number;
+    y: number;
+    size: number;
+    type: "circle" | "square" | "cone";
+    rotation?: number; // Para el cono
+  };
+
+  const [areaMode, setAreaMode] = useState<"circle" | "square" | "cone" | false>(false);
+  const [areaShapes, setAreaShapes] = useState<AreaShape[]>([]);
+  const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
+  const [isDraggingArea, setIsDraggingArea] = useState(false);
+
+  useEffect(() => {
+    const transformer = transformerRef.current;
+
+    if (!transformer) return;
+
+    if (selectedAreaId) {
+      const node = shapeRefs.current.get(selectedAreaId);
+      if (node) {
+        transformer.nodes([node]);
+        transformer.getLayer()?.batchDraw();
+      } else {
+        transformer.nodes([]);
+        transformer.getLayer()?.batchDraw();
+      }
+    } else {
+      transformer.nodes([]);
+      transformer.getLayer()?.batchDraw();
+    }
+  }, [selectedAreaId, areaShapes]);
+
+  useEffect(() => {
+    if (!selectedAreaId) return;
+
+    const stillExists = areaShapes.some(circle => circle.id === selectedAreaId);
+
+    if (!stillExists) {
+      setSelectedAreaId(null);
+      if (transformerRef.current) {
+        transformerRef.current.nodes([]);
+        transformerRef.current.getLayer()?.batchDraw();
+      }
+    }
+  }, [areaShapes, selectedAreaId]);
+
 
   const handleContextMenu = (e: React.MouseEvent, index: number) => {
     e.preventDefault();
@@ -214,6 +268,27 @@ export default function GridAdaptativo() {
         setMeasureStart({ x, y });
         setMeasureEnd({ x, y });
       }
+      return;
+    }
+
+    if (areaMode) {
+      const mousePos = e.target.getStage().getPointerPosition();
+      if (!mousePos) return;
+
+      const snapped = snapToGrid(mousePos.x, mousePos.y, tileSize);
+      const id = crypto.randomUUID();
+      const baseShape: AreaShape = {
+        id,
+        x: snapped.x,
+        y: snapped.y,
+        size: tileSize * 2,
+        type: areaMode,
+        rotation: 0,
+      };
+
+      setAreaShapes(prev => [...prev, baseShape]);
+      setSelectedAreaId(id);
+      setAreaMode(false); // Desactiva modo después de colocar
       return;
     }
 
@@ -493,7 +568,53 @@ export default function GridAdaptativo() {
         {measureMode ? "Desactivar Medición" : "Medir Distancia"}
       </button>
 
+      <button
+        onClick={() => {
+          setAreaMode("circle");
+          setPaintMode(false);
+          setMoveMode(false);
+          setMeasureMode(false);
+        }}
+        style={{
+          backgroundColor: areaMode === "circle" ? "lightblue" : "lightgray",
+          padding: "5px 10px",
+          marginLeft: 10,
+        }}
+      >
+        Colocar Círculo
+      </button>
 
+      <button
+        onClick={() => {
+          setAreaMode("square");
+          setPaintMode(false);
+          setMoveMode(false);
+          setMeasureMode(false);
+        }}
+        style={{
+          backgroundColor: areaMode === "square" ? "lightblue" : "lightgray",
+          padding: "5px 10px",
+          marginLeft: 10,
+        }}
+      >
+        Colocar Cuadrado
+      </button>
+
+      <button
+        onClick={() => {
+          setAreaMode("cone");
+          setPaintMode(false);
+          setMoveMode(false);
+          setMeasureMode(false);
+        }}
+        style={{
+          backgroundColor: areaMode === "cone" ? "lightblue" : "lightgray",
+          padding: "5px 10px",
+          marginLeft: 10,
+        }}
+      >
+        Colocar Cono
+      </button>
 
       <Stage
         width={gridWidth}
@@ -587,10 +708,8 @@ export default function GridAdaptativo() {
 
           {/* Círculo de player */}
           {tokens.map((token) => (
-            <>
-              {/* Vida arriba */}
+            <React.Fragment key={token.id}>
               <Text
-                key={`vida-${token.id}`}
                 x={token.x - token.radius}
                 y={token.y - token.radius - 18}
                 width={token.radius * 2}
@@ -600,10 +719,8 @@ export default function GridAdaptativo() {
                 fill="black"
               />
 
-              {/* Token: Imagen si hay, sino círculo */}
               {token.image ? (
                 <CircularToken
-                  key={token.id}
                   image={token.image}
                   x={token.x}
                   y={token.y}
@@ -623,7 +740,6 @@ export default function GridAdaptativo() {
                 />
               ) : (
                 <Circle
-                  key={token.id}
                   x={token.x}
                   y={token.y}
                   radius={token.radius}
@@ -645,9 +761,7 @@ export default function GridAdaptativo() {
                 />
               )}
 
-              {/* Nombre abajo */}
               <Text
-                key={`nombre-${token.id}`}
                 x={token.x - token.radius}
                 y={token.y + token.radius + 2}
                 width={token.radius * 2}
@@ -656,8 +770,110 @@ export default function GridAdaptativo() {
                 fontSize={12}
                 fill="black"
               />
-            </>
+            </React.Fragment>
           ))}
+
+          {areaShapes.map((shape) => {
+            const commonProps = {
+              x: shape.x,
+              y: shape.y,
+              fill: "rgba(255, 0, 0, 0.3)",
+              stroke: "red",
+              strokeWidth: 2,
+              draggable: true,
+              ref: (node: any) => {
+                if (node) shapeRefs.current.set(shape.id, node);
+              },
+              onClick: () => setSelectedAreaId(shape.id),
+              onTap: () => setSelectedAreaId(shape.id),
+              onDragEnd: (e: any) => {
+                const { x, y } = e.target.position();
+                setAreaShapes(prev =>
+                  prev.map(s =>
+                    s.id === shape.id ? { ...s, x, y } : s
+                  )
+                );
+              },
+              onTransformEnd: (e: any) => {
+                const node = e.target;
+                const scale = node.scaleX();
+                node.scaleX(1);
+                node.scaleY(1);
+                const rotation = node.rotation();
+
+                setAreaShapes(prev =>
+                  prev.map(s =>
+                    s.id === shape.id
+                      ? {
+                        ...s,
+                        size: s.size * scale,
+                        rotation, // ✨ nuevo
+                      }
+                      : s
+                  )
+                );
+              },
+              onContextMenu: (e: any) => {
+                e.evt.preventDefault();
+                setAreaShapes(prev => prev.filter(s => s.id !== shape.id));
+                if (selectedAreaId === shape.id) setSelectedAreaId(null);
+              },
+            };
+
+            if (shape.type === "circle") {
+              return <Circle key={shape.id} {...commonProps} radius={shape.size / 2} />;
+            }
+
+            if (shape.type === "square") {
+              return (
+                <Rect
+                  key={shape.id}
+                  {...commonProps}
+                  width={shape.size}
+                  height={shape.size}
+                  offsetX={shape.size / 2}
+                  offsetY={shape.size / 2}
+                />
+              );
+            }
+
+            if (shape.type === "cone") {
+              const points = [
+                0, 0,
+                shape.size, -shape.size / 2,
+                shape.size, shape.size / 2,
+              ];
+              return (
+                <Line
+                  key={shape.id}
+                  {...commonProps}
+                  points={points}
+                  closed
+                  offsetX={0}
+                  offsetY={0}
+                  rotation={shape.rotation || 0}
+                />
+              );
+            }
+
+            return null;
+          })}
+
+          <Transformer
+            ref={transformerRef}
+            rotateEnabled={true}
+            enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
+            boundBoxFunc={(oldBox, newBox) => {
+              const size = Math.max(newBox.width, newBox.height);
+              return {
+                x: newBox.x,
+                y: newBox.y,
+                width: size,
+                height: size,
+                rotation: newBox.rotation, // necesario si rotás
+              };
+            }}
+          />
 
         </Layer>
       </Stage>
@@ -746,6 +962,26 @@ export default function GridAdaptativo() {
             }}
             style={{ display: "block", marginBottom: 8 }}
           />
+
+          <hr style={{ margin: "8px 0" }} />
+          <button
+            onClick={() => {
+              setTokens(tokens => tokens.filter(t => t.id !== contextTokenId));
+              setContextTokenId(null);
+              setContextMenuVisible(false);
+            }}
+            style={{
+              backgroundColor: "crimson",
+              color: "white",
+              border: "none",
+              padding: "6px 12px",
+              cursor: "pointer",
+              width: "100%",
+              fontWeight: "bold",
+            }}
+          >
+            🗑 Eliminar Token
+          </button>
         </div>
 
       )}
