@@ -380,17 +380,27 @@ export default function GridAdaptativo() {
     }
 
 
-    if (!paintMode) return;
-
-    setIsDrawing(true);
     const mousePos = e.target.getStage().getPointerPosition();
     if (!mousePos) return;
     const x = Math.floor(mousePos.x / tileSize);
     const y = Math.floor(mousePos.y / tileSize);
-    if (isShiftDown) {
-      setRectPaintStart({ x, y });
-    } else {
-      paintTile(x, y);
+
+    // 🟦 Iniciar selección múltiple si estamos en moveMode y Shift está presionado
+    if (moveMode && isShiftDown) {
+      setSelectionStart({ x: mousePos.x, y: mousePos.y });
+      setSelectionRect({ x: mousePos.x, y: mousePos.y, width: 0, height: 0 });
+      return;
+    }
+
+    // 🟥 Pintar si estamos en paintMode
+    if (paintMode) {
+      setIsDrawing(true);
+      if (isShiftDown) {
+        setRectPaintStart({ x, y });
+      } else {
+        paintTile(x, y);
+      }
+      return;
     }
   };
 
