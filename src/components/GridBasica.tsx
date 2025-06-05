@@ -28,7 +28,12 @@ export default function GridAdaptativo() {
   const [tokens, setTokens] = useState<Token[]>([]);
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
   const tokenSize = baseTileSize / 2; // Tamaño del token
+  const [dragOffsets, setDragOffsets] = useState<{ [id: string]: { dx: number; dy: number } }>({});
 
+  //Area de selección de multiples tokens
+  const [selectionRect, setSelectionRect] = useState<null | { x: number; y: number; width: number; height: number }>(null);
+  const [multiSelectedIds, setMultiSelectedIds] = useState<string[]>([]);
+  const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null);
 
   // Estado para el usuario
   const [paintMode, setPaintMode] = useState(false);
@@ -90,7 +95,7 @@ export default function GridAdaptativo() {
   const [areaMode, setAreaMode] = useState<"circle" | "square" | "cone" | false>(false);
   const [areaShapes, setAreaShapes] = useState<AreaShape[]>([]);
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
-  const [isDraggingArea, setIsDraggingArea] = useState(false);
+
 
   useEffect(() => {
     const transformer = transformerRef.current;
@@ -226,23 +231,25 @@ export default function GridAdaptativo() {
 
   // Movimiento con mouse
   const handleMouseMovePlayer = (e: any) => {
-    if (!moveMode || !isDraggingPlayer || !selectedTokenId) return;
+    if (!moveMode || !isDraggingPlayer || Object.keys(dragOffsets).length === 0)
+      return;
 
     const stage = e.target.getStage();
-    const mousePos = stage?.getPointerPosition();
-    if (!mousePos) return;
+    const pos = stage?.getPointerPosition();
+    if (!pos) return;
 
-    const selectedToken = tokens.find(t => t.id === selectedTokenId);
-    if (!selectedToken) return;
-
-    const { x, y } = snapToGrid(mousePos.x, mousePos.y, selectedToken.radius);
-
-    const updatedTokens = tokens.map(token =>
-      token.id === selectedTokenId
-        ? { ...token, x, y }
-        : token
+    setTokens((tokens) =>
+      tokens.map((token) => {
+        if (dragOffsets[token.id]) {
+          const { dx, dy } = dragOffsets[token.id];
+          const newX = pos.x + dx;
+          const newY = pos.y + dy;
+          const snapped = snapToGrid(newX, newY, token.radius);
+          return { ...token, x: snapped.x, y: snapped.y };
+        }
+        return token;
+      })
     );
-    setTokens(updatedTokens);
   };
 
 
@@ -284,6 +291,15 @@ export default function GridAdaptativo() {
   // Manejo de eventos del mouse
   // para pintar casillas
   const handleMouseDown = (e: any) => {
+    if (moveMode && isShiftDown) {
+      const stage = e.target.getStage();
+      const pos = stage?.getPointerPosition();
+      if (pos) {
+        setSelectionStart(pos);
+        setSelectionRect({ x: pos.x, y: pos.y, width: 0, height: 0 });
+      }
+    }
+
     if (measureMode) {
       const mousePos = e.target.getStage().getPointerPosition();
       if (mousePos) {
@@ -330,7 +346,18 @@ export default function GridAdaptativo() {
   };
 
   const handleMouseMove = (e: any) => {
-    // Si no estamos en modo pintura, no hacemos nada
+    if (moveMode && isShiftDown && selectionStart) {
+      const stage = e.target.getStage();
+      const pos = stage?.getPointerPosition();
+      if (pos) {
+        const x = Math.min(selectionStart.x, pos.x);
+        const y = Math.min(selectionStart.y, pos.y);
+        const width = Math.abs(pos.x - selectionStart.x);
+        const height = Math.abs(pos.y - selectionStart.y);
+        setSelectionRect({ x, y, width, height });
+      }
+    }
+
     if (measureMode && measureStart) {
       const mousePos = e.target.getStage().getPointerPosition();
       if (mousePos) {
@@ -362,6 +389,26 @@ export default function GridAdaptativo() {
   };
 
   const handleMouseUp = () => {
+    if (moveMode && isShiftDown && selectionRect) {
+      const selected = tokens.filter(token => {
+        const tokenLeft = token.x - token.radius;
+        const tokenRight = token.x + token.radius;
+        const tokenTop = token.y - token.radius;
+        const tokenBottom = token.y + token.radius;
+
+        return (
+          tokenLeft >= selectionRect.x &&
+          tokenRight <= selectionRect.x + selectionRect.width &&
+          tokenTop >= selectionRect.y &&
+          tokenBottom <= selectionRect.y + selectionRect.height
+        );
+      }).map(t => t.id);
+
+      setMultiSelectedIds(selected);
+      setSelectionRect(null);
+      setSelectionStart(null);
+    }
+
     setIsDrawing(false);
     if (measureMode && measureStart && measureEnd) {
       // Mantiene la línea dibujada o limpia si preferís
@@ -667,8 +714,9 @@ export default function GridAdaptativo() {
           handleMouseMovePlayer(e);   // Para mover el jugador (si moveMode está activo)
         }}
         onMouseUp={() => {
-          handleMouseUp();            // Para dejar de pintar
-          setIsDraggingPlayer(false); // Para dejar de mover el jugador
+          handleMouseUp();
+          setIsDraggingPlayer(false);
+          setDragOffsets({});
         }}
         style={{ background: "#ffffff" }}
         tabIndex={0}
@@ -686,6 +734,20 @@ export default function GridAdaptativo() {
           )}
 
           {drawGrid()}
+
+          {/* Area de Selección */}
+          {selectionRect && (
+            <Rect
+              x={selectionRect.x}
+              y={selectionRect.y}
+              width={selectionRect.width}
+              height={selectionRect.height}
+              stroke="blue"
+              dash={[4, 4]}
+              fill="rgba(0, 0, 255, 0.1)"
+            />
+          )}
+
           {/* Casillas pintadas con color */}
           {[...paintedTiles.entries()].map(([key, color]) => {
             const [x, y] = key.split(",").map(Number);
@@ -779,6 +841,7 @@ export default function GridAdaptativo() {
                     setContextMenuPosition({ x: e.evt.clientX, y: e.evt.clientY });
                     setContextMenuVisible(true);
                   }}
+
                 />
               ) : (
                 <Circle
@@ -786,12 +849,49 @@ export default function GridAdaptativo() {
                   y={token.y}
                   radius={token.radius}
                   fill={token.color}
-                  stroke={token.id === selectedTokenId ? "black" : undefined}
-                  strokeWidth={token.id === selectedTokenId ? 2 : 0}
-                  onMouseDown={() => {
+                  stroke={
+                    token.id === selectedTokenId || multiSelectedIds.includes(token.id)
+                      ? "black"
+                      : undefined
+                  }
+                  strokeWidth={
+                    token.id === selectedTokenId || multiSelectedIds.includes(token.id)
+                      ? 2
+                      : 0
+                  }
+                  onMouseDown={(e) => {
                     if (moveMode) {
+                      const stage = e.target.getStage();
+                      const pos = stage?.getPointerPosition();
+                      const offsets: { [id: string]: { dx: number; dy: number } } = {};
+                      if (!pos) return;
+
                       setSelectedTokenId(token.id);
+                      if (multiSelectedIds.length > 1 || (multiSelectedIds.length === 1 && multiSelectedIds[0] !== token.id)) {
+                        setMultiSelectedIds([token.id]);
+                      }
                       setIsDraggingPlayer(true);
+                      setDragOffsets(offsets);
+
+
+
+                      // Obtener tokens a mover (el seleccionado o todos los múltiples)
+                      const movingIds = multiSelectedIds.length > 0
+                        ? multiSelectedIds.includes(token.id)
+                          ? multiSelectedIds
+                          : [token.id]
+                        : [token.id];
+
+                      for (const t of tokens) {
+                        if (movingIds.includes(t.id)) {
+                          offsets[t.id] = {
+                            dx: t.x - pos.x,
+                            dy: t.y - pos.y,
+                          };
+                        }
+                      }
+
+                      setDragOffsets(offsets);
                     }
                   }}
                   onContextMenu={(e) => {
@@ -849,7 +949,7 @@ export default function GridAdaptativo() {
                       ? {
                         ...s,
                         size: s.size * scale,
-                        rotation, // ✨ nuevo
+                        rotation,
                       }
                       : s
                   )
