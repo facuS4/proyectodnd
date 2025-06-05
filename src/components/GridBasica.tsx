@@ -39,6 +39,8 @@ export default function GridAdaptativo() {
   const [paintMode, setPaintMode] = useState(false);
   const [moveMode, setMoveMode] = useState(false);
   const [isDraggingPlayer, setIsDraggingPlayer] = useState(false);
+  const [linePaintMode, setLinePaintMode] = useState(false);
+const [paintedLines, setPaintedLines] = useState<Set<string>>(new Set());
 
   //Estados regla
   const [measureMode, setMeasureMode] = useState(false);
@@ -141,6 +143,8 @@ export default function GridAdaptativo() {
       if (!e.shiftKey) {
         setIsShiftDown(false);
         setRectPaintStart(null);
+        setSelectionRect(null);     // 👈 Cancela el rectángulo de selección si estaba activo
+        setSelectionStart(null);    // 👈 Cancela el inicio también
       }
     };
     window.addEventListener("keydown", handleKeyDown);
