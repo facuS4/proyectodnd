@@ -5,13 +5,57 @@ import CircularToken from "./CircularTokenProps";
 import AudioPanel from "./AudioPanel";
 import { DiceRoller } from "./diceroller";
 import React from "react";
+import ColorPalette from "./ColorPalette";
 
 export default function GridAdaptativo() {
+
+  //#region GRID
   const baseTileSize = 50; // Tamaño base de la casilla
 
   const gridWidth = 2000; // Ancho del grid
   const gridHeight = 1000; // Alto del grid
 
+  // Calculamos el número de columnas y filas basado en el tamaño del grid y el tamaño de la casilla
+  const numCols = Math.floor(gridWidth / baseTileSize);
+  const numRows = Math.floor(gridHeight / baseTileSize);
+
+  const tileSizeW = gridWidth / numCols;
+  const tileSizeH = gridHeight / numRows;
+  const tileSize = Math.min(tileSizeW, tileSizeH);
+
+  // Estado para la imagen del fondo
+  const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
+
+  //Dibujar la Grid
+  const drawGrid = () => {
+    const lines = [];
+
+    for (let i = 0; i <= numCols; i++) {
+      lines.push(
+        <Line
+          key={`v-${i}`}
+          points={[i * tileSize, 0, i * tileSize, numRows * tileSize]}
+          stroke="gray"
+        />
+      );
+    }
+
+    for (let i = 0; i <= numRows; i++) {
+      lines.push(
+        <Line
+          key={`h-${i}`}
+          points={[0, i * tileSize, numCols * tileSize, i * tileSize]}
+          stroke="gray"
+        />
+      );
+    }
+
+    return lines;
+  };
+
+  //#endregion
+
+  //#region TOKENS
   // Token
   type Token = {
     id: string;
@@ -35,31 +79,130 @@ export default function GridAdaptativo() {
   const [multiSelectedIds, setMultiSelectedIds] = useState<string[]>([]);
   const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null);
 
-  // Estado para el usuario
-  const [paintMode, setPaintMode] = useState(false);
-  const [moveMode, setMoveMode] = useState(false);
-  const [isDraggingPlayer, setIsDraggingPlayer] = useState(false);
-
-  //Estados regla
-  const [measureMode, setMeasureMode] = useState(false);
-  const [measureStart, setMeasureStart] = useState<{ x: number; y: number } | null>(null);
-  const [measureEnd, setMeasureEnd] = useState<{ x: number; y: number } | null>(null);
-
-  //Cambiar cosas del token
+  //Cambiar atributos del token
   const [contextMenuVisible, setContextMenuVisible] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const [contextTokenId, setContextTokenId] = useState<string | null>(null);
 
-  // Estado para la imagen del fondo
-  const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
+  //Cerrar el menú del token
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setContextMenuVisible(false);
+      setContextTokenId(null);
+    };
 
-  // Calculamos el número de columnas y filas basado en el tamaño del grid y el tamaño de la casilla
-  const numCols = Math.floor(gridWidth / baseTileSize);
-  const numRows = Math.floor(gridHeight / baseTileSize);
+    window.addEventListener("click", handleClickOutside);
+    return () => window.removeEventListener("click", handleClickOutside);
+  }, []);
 
-  const tileSizeW = gridWidth / numCols;
-  const tileSizeH = gridHeight / numRows;
-  const tileSize = Math.min(tileSizeW, tileSizeH);
+  // Funcion para Snapear el tamaño del círculo al tamaño de la casilla
+  const snapToGrid = (x: number, y: number, radius: number) => {
+    const tilesCovered = Math.round((radius * 2) / tileSize);
+    const offset = tilesCovered % 2 === 0 ? 0 : 0.5;
+
+    const snappedX = (Math.floor(x / tileSize) + offset) * tileSize;
+    const snappedY = (Math.floor(y / tileSize) + offset) * tileSize;
+
+    return { x: snappedX, y: snappedY };
+  };
+
+  // Funcion para agregar tokens
+  const addNewToken = () => {
+    const id = crypto.randomUUID(); // Genera un ID único (compatible con navegadores modernos)
+    const newToken: Token = {
+      id,
+      x: 0.5 * tileSize,
+      y: 0.5 * tileSize,
+      radius: tileSize / 2,
+      color: "red", // Podés cambiar esto más adelante
+      nombre: "",
+      vida: "",
+      image: null,
+    };
+    setTokens(prev => [...prev, newToken]);
+  };
+
+  //Agrandar y Reducir el token
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!selectedTokenId) return;
+
+      setTokens((prevTokens) =>
+        prevTokens.map((token) => {
+          if (token.id !== selectedTokenId) return token;
+
+
+          if (selectedTokenId) {
+            if (e.key.toLowerCase() === "r") {
+              setTokens(tokens =>
+                tokens.map(token => {
+                  if (token.id === selectedTokenId) {
+                    const newRadius = Math.min(token.radius + tokenSize, tileSize * 2);
+                    const snapped = snapToGrid(token.x, token.y, newRadius);
+                    return { ...token, radius: newRadius, x: snapped.x, y: snapped.y };
+                  }
+                  return token;
+                })
+              );
+            }
+
+            if (e.key.toLowerCase() === "f") {
+              setTokens(tokens =>
+                tokens.map(token => {
+                  if (token.id === selectedTokenId) {
+                    const newRadius = Math.max(token.radius - tokenSize, tileSize / 2);
+                    const snapped = snapToGrid(token.x, token.y, newRadius);
+                    return { ...token, radius: newRadius, x: snapped.x, y: snapped.y };
+                  }
+                  return token;
+                })
+              );
+            }
+          } // cierre de if selectedTokenId
+
+          return token; // Retorna el token sin cambios si no es el seleccionado
+        })
+      );
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedTokenId, numCols, numRows, tileSize]);
+
+  //#endregion
+
+  //#region PALETA
+  const [selectedColor, setSelectedColor] = useState("orange");
+
+  const [paletteColors, setPaletteColors] = useState([
+    "rgb(255, 255, 255)", "rgb(0, 0, 0)", "rgb(255, 76, 76)", "rgb(255, 0, 0)",
+    "rgb(178, 0, 0)", "rgb(255, 255, 76)", "rgb(255, 255, 0)", "rgb(178, 178, 0)",
+    "rgb(76, 76, 255)", "rgb(0, 0, 255)", "rgb(0, 0, 178)", "rgb(76, 166, 76)",
+    "rgb(0, 128, 0)", "rgb(0, 89, 0)", "rgb(255, 190, 76)", "rgb(255, 165, 0)",
+    "rgb(178, 115, 0)", "rgb(166, 76, 166)", "rgb(128, 0, 128)", "rgb(89, 0, 89)",
+  ]);
+
+  const rgbToHex = (rgb: string): string => {
+    const result = /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/.exec(rgb);
+    if (!result) return "#000000";
+    const r = parseInt(result[1]).toString(16).padStart(2, "0");
+    const g = parseInt(result[2]).toString(16).padStart(2, "0");
+    const b = parseInt(result[3]).toString(16).padStart(2, "0");
+    return `#${r}${g}${b}`;
+  };
+
+  const hexToRgb = (hex: string): string => {
+    const parsedHex = hex.replace("#", "");
+    const bigint = parseInt(parsedHex, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return `rgb(${r}, ${g}, ${b})`;
+  };
+
+  //#endregion
+
+  //#region PINTAR
 
   //Pintar lineas
   const [paintedEdges, setPaintedEdges] = useState<Map<string, string>>(new Map());
@@ -70,22 +213,42 @@ export default function GridAdaptativo() {
   const [paintedTiles, setPaintedTiles] = useState<Map<string, string>>(new Map());
   const [isDrawing, setIsDrawing] = useState(false);
 
-  // refs para cada input color
-  const [selectedColor, setSelectedColor] = useState("orange");
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [pickerIndex, setPickerIndex] = useState<number | null>(null);
-  const [pickerStyle, setPickerStyle] = useState({ top: 0, left: 0, visibility: "hidden" as "hidden" | "visible" });
-
   //Pintar en area
   const [isShiftDown, setIsShiftDown] = useState(false);
   const [rectPaintStart, setRectPaintStart] = useState<{ x: number; y: number } | null>(null);
-
   const posKey = (x: number, y: number) => `${x},${y}`;
+
+  const paintTile = (x: number, y: number) => {
+    if (x < 0 || x >= numCols || y < 0 || y >= numRows) return;
+
+    setPaintedTiles((prev) => {
+      const newMap = new Map(prev);
+      const key = posKey(x, y);
+
+      if (selectedColor === "rgb(255, 255, 255)") {
+        newMap.delete(key); // Elimina la casilla si se pinta con blanco
+      } else {
+        newMap.set(key, selectedColor); // Si no es blanco, pinta normalmente
+      }
+
+      return newMap;
+    });
+  };
+
+  // Cambiar paintMode
+  const togglePaintMode = () => {
+    setPaintMode((prev) => {
+      if (!prev) setMoveMode(false); // Al activar pintar, desactiva mover
+      return !prev;
+    });
+  };
+
+  //#endregion
+
+  //#region LASER
 
   //Laser
   const [laserMode, setLaserMode] = useState(false);
-  const lastLaserPoint = useRef<{ x: number; y: number } | null>(null);
-  type TrailPoint = { x: number; y: number; time: number };
   const [laserPath, setLaserPath] = useState<{ x: number; y: number; time: number }[]>([]);
 
   useEffect(() => {
@@ -98,6 +261,10 @@ export default function GridAdaptativo() {
 
     return () => clearInterval(interval);
   }, [laserMode]);
+
+  //#endregion
+
+  //#region AREAS
 
   //AREAS
   const transformerRef = useRef<any>(null);
@@ -151,6 +318,18 @@ export default function GridAdaptativo() {
     }
   }, [areaShapes, selectedAreaId]);
 
+  //#endregion
+
+  //#region REGLA
+
+  //Estados regla
+  const [measureMode, setMeasureMode] = useState(false);
+  const [measureStart, setMeasureStart] = useState<{ x: number; y: number } | null>(null);
+  const [measureEnd, setMeasureEnd] = useState<{ x: number; y: number } | null>(null);
+
+  //#endregion
+
+  //#region EVENTOS
 
   //Apretar el shift
   useEffect(() => {
@@ -161,8 +340,8 @@ export default function GridAdaptativo() {
       if (!e.shiftKey) {
         setIsShiftDown(false);
         setRectPaintStart(null);
-        setSelectionRect(null);     // 👈 Cancela el rectángulo de selección si estaba activo
-        setSelectionStart(null);    // 👈 Cancela el inicio también
+        setSelectionRect(null);
+        setSelectionStart(null);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -172,76 +351,6 @@ export default function GridAdaptativo() {
       window.removeEventListener("keyup", handleKeyUp);
     };
   }, []);
-
-
-  const handleContextMenu = (e: React.MouseEvent, index: number) => {
-    e.preventDefault();
-    const x = e.clientX;
-    const y = e.clientY;
-    setPickerIndex(index);
-    setPickerStyle({ left: x, top: y, visibility: "visible" });
-
-    setTimeout(() => {
-      inputRef.current?.click();
-    }, 0);
-  };
-
-  //cerrar el menú del token
-  useEffect(() => {
-    const handleClickOutside = () => {
-      setContextMenuVisible(false);
-      setContextTokenId(null);
-    };
-
-    window.addEventListener("click", handleClickOutside);
-    return () => window.removeEventListener("click", handleClickOutside);
-  }, []);
-
-  // Funcion para Snapear el tamaño del círculo al tamaño de la casilla
-  const snapToGrid = (x: number, y: number, radius: number) => {
-    const tilesCovered = Math.round((radius * 2) / tileSize);
-    const offset = tilesCovered % 2 === 0 ? 0 : 0.5;
-
-    const snappedX = (Math.floor(x / tileSize) + offset) * tileSize;
-    const snappedY = (Math.floor(y / tileSize) + offset) * tileSize;
-
-    return { x: snappedX, y: snappedY };
-  };
-
-  // Funcion para agregar tokens
-  const addNewToken = () => {
-    const id = crypto.randomUUID(); // Genera un ID único (compatible con navegadores modernos)
-    const newToken: Token = {
-      id,
-      x: 0.5 * tileSize,
-      y: 0.5 * tileSize,
-      radius: tileSize / 2,
-      color: "red", // Podés cambiar esto más adelante
-      nombre: "",
-      vida: "",
-      image: null,
-    };
-    setTokens(prev => [...prev, newToken]);
-  };
-
-
-
-  const paintTile = (x: number, y: number) => {
-    if (x < 0 || x >= numCols || y < 0 || y >= numRows) return;
-
-    setPaintedTiles((prev) => {
-      const newMap = new Map(prev);
-      const key = posKey(x, y);
-
-      if (selectedColor === "rgb(255, 255, 255)") {
-        newMap.delete(key); // Elimina la casilla si se pinta con blanco
-      } else {
-        newMap.set(key, selectedColor); // Si no es blanco, pinta normalmente
-      }
-
-      return newMap;
-    });
-  };
 
   // Cambiar a moverse con el mouse
   const toggleMoveMode = () => {
@@ -274,45 +383,9 @@ export default function GridAdaptativo() {
     );
   };
 
-
-  //Funcion para cambiar de color
-  const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (pickerIndex === null) return;
-    const newColors = [...colors];
-    newColors[pickerIndex] = hexToRgb(e.target.value); // Convertimos HEX a RGB
-    setColors(newColors);
-  };
-
-  //transformar de hex a rgb
-  function rgbToHex(rgb: string): string {
-    const result = /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/.exec(rgb);
-    if (!result) return "#000000";
-    const r = parseInt(result[1]).toString(16).padStart(2, "0");
-    const g = parseInt(result[2]).toString(16).padStart(2, "0");
-    const b = parseInt(result[3]).toString(16).padStart(2, "0");
-    return `#${r}${g}${b}`;
-  }
-
-  function hexToRgb(hex: string): string {
-    const parsedHex = hex.replace("#", "");
-    const bigint = parseInt(parsedHex, 16);
-    const r = (bigint >> 16) & 255;
-    const g = (bigint >> 8) & 255;
-    const b = bigint & 255;
-    return `rgb(${r}, ${g}, ${b})`;
-  }
-
-  // Cambiar paintMode
-  const togglePaintMode = () => {
-    setPaintMode((prev) => {
-      if (!prev) setMoveMode(false); // Al activar pintar, desactiva mover
-      return !prev;
-    });
-  };
-
   // Manejo de eventos del mouse
-  // para pintar casillas
   const handleMouseDown = (e: any) => {
+    //Utilizar la regla
     if (measureMode) {
       const mousePos = e.target.getStage().getPointerPosition();
       if (mousePos) {
@@ -324,6 +397,7 @@ export default function GridAdaptativo() {
       return;
     }
 
+    //Area para seleccionar multiples tokens
     if (areaMode) {
       const mousePos = e.target.getStage().getPointerPosition();
       if (!mousePos) return;
@@ -345,6 +419,19 @@ export default function GridAdaptativo() {
       return;
     }
 
+    const mousePos = e.target.getStage().getPointerPosition();
+    if (!mousePos) return;
+    const x = Math.floor(mousePos.x / tileSize);
+    const y = Math.floor(mousePos.y / tileSize);
+
+    // Iniciar selección múltiple si estamos en moveMode y Shift está presionado
+    if (moveMode && isShiftDown) {
+      setSelectionStart({ x: mousePos.x, y: mousePos.y });
+      setSelectionRect({ x: mousePos.x, y: mousePos.y, width: 0, height: 0 });
+      return;
+    }
+
+    //Pintar bordes de las celdas
     if (paintEdgesMode) {
       const mousePos = e.target.getStage().getPointerPosition();
       if (!mousePos) return;
@@ -375,24 +462,11 @@ export default function GridAdaptativo() {
         });
       }
 
-      setIsDrawingEdge(true); // ✅ Empezamos a pintar
+      setIsDrawingEdge(true);
       return;
     }
 
-
-    const mousePos = e.target.getStage().getPointerPosition();
-    if (!mousePos) return;
-    const x = Math.floor(mousePos.x / tileSize);
-    const y = Math.floor(mousePos.y / tileSize);
-
-    // 🟦 Iniciar selección múltiple si estamos en moveMode y Shift está presionado
-    if (moveMode && isShiftDown) {
-      setSelectionStart({ x: mousePos.x, y: mousePos.y });
-      setSelectionRect({ x: mousePos.x, y: mousePos.y, width: 0, height: 0 });
-      return;
-    }
-
-    // 🟥 Pintar si estamos en paintMode
+    //Pintar si estamos en paintMode
     if (paintMode) {
       setIsDrawing(true);
       if (isShiftDown) {
@@ -404,7 +478,9 @@ export default function GridAdaptativo() {
     }
   };
 
+  //Eventos al mover el cursor
   const handleMouseMove = (e: any) => {
+    //Utilizar el laser
     if (laserMode) {
       const pos = e.target.getStage()?.getPointerPosition();
       if (pos) {
@@ -414,6 +490,7 @@ export default function GridAdaptativo() {
       return;
     }
 
+    //Pintar los bordes de las celdas
     if (paintEdgesMode && isDrawingEdge) {
       const mousePos = e.target.getStage().getPointerPosition();
       if (!mousePos) return;
@@ -447,6 +524,7 @@ export default function GridAdaptativo() {
       return;
     }
 
+    //Mover multiples tokens seleccionados
     if (moveMode && isShiftDown && selectionStart) {
       const stage = e.target.getStage();
       const pos = stage?.getPointerPosition();
@@ -459,6 +537,7 @@ export default function GridAdaptativo() {
       }
     }
 
+    //Mover la regla
     if (measureMode && measureStart) {
       const mousePos = e.target.getStage().getPointerPosition();
       if (mousePos) {
@@ -467,13 +546,15 @@ export default function GridAdaptativo() {
         setMeasureEnd({ x, y });
       }
     }
+
     if (!paintMode) return;
     if (!isDrawing) return;
     const mousePos = e.target.getStage().getPointerPosition();
     if (!mousePos) return;
+
+    //Pintar multiples casillas 
     const x = Math.floor(mousePos.x / tileSize);
     const y = Math.floor(mousePos.y / tileSize);
-
     if (isShiftDown && rectPaintStart) {
       const x1 = Math.min(rectPaintStart.x, x);
       const x2 = Math.max(rectPaintStart.x, x);
@@ -489,11 +570,14 @@ export default function GridAdaptativo() {
     }
   };
 
+  //Finalizar eventos al soltar el cursor
   const handleMouseUp = () => {
+    //Terminar de pintar los bordes de las casillas
     if (paintEdgesMode) {
       setIsDrawingEdge(false);
     }
 
+    //Selecciona todos los tokens completamente contenidos dentro del rectángulo de selección
     if (moveMode && isShiftDown && selectionRect) {
       const selected = tokens.filter(token => {
         const tokenLeft = token.x - token.radius;
@@ -508,14 +592,15 @@ export default function GridAdaptativo() {
           tokenBottom <= selectionRect.y + selectionRect.height
         );
       }).map(t => t.id);
-
       setMultiSelectedIds(selected);
       setSelectionRect(null);
       setSelectionStart(null);
     }
 
+    //Termina de pintar
     setIsDrawing(false);
 
+    //Terminar de medir
     if (measureMode && measureStart && measureEnd) {
       setMeasureStart(null);
       setMeasureEnd(null);
@@ -525,151 +610,23 @@ export default function GridAdaptativo() {
     setRectPaintStart(null);
   };
 
+  //#endregion
 
-  // Manejo de eventos del teclado para mover el "player"
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!selectedTokenId) return;
+  //#region ESTADOS
 
-      setTokens((prevTokens) =>
-        prevTokens.map((token) => {
-          if (token.id !== selectedTokenId) return token;
+  const [paintMode, setPaintMode] = useState(false);
+  const [moveMode, setMoveMode] = useState(false);
+  const [isDraggingPlayer, setIsDraggingPlayer] = useState(false);
 
-
-          if (selectedTokenId) {
-            if (e.key.toLowerCase() === "r") {
-              setTokens(tokens =>
-                tokens.map(token => {
-                  if (token.id === selectedTokenId) {
-                    const newRadius = Math.min(token.radius + tokenSize, tileSize * 2);
-                    const snapped = snapToGrid(token.x, token.y, newRadius);
-                    return { ...token, radius: newRadius, x: snapped.x, y: snapped.y };
-                  }
-                  return token;
-                })
-              );
-            }
-
-            if (e.key.toLowerCase() === "f") {
-              setTokens(tokens =>
-                tokens.map(token => {
-                  if (token.id === selectedTokenId) {
-                    const newRadius = Math.max(token.radius - tokenSize, tileSize / 2);
-                    const snapped = snapToGrid(token.x, token.y, newRadius);
-                    return { ...token, radius: newRadius, x: snapped.x, y: snapped.y };
-                  }
-                  return token;
-                })
-              );
-            }
-          } // cierre de if selectedTokenId
-
-          return token; // Retorna el token sin cambios si no es el seleccionado
-        })
-      );
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedTokenId, numCols, numRows, tileSize]);
-
-
-  // Paleta básica de colores
-  const [colors, setColors] = useState([
-    "rgb(255, 255, 255)",  // white
-    "rgb(0, 0, 0)",        // black
-    "rgb(255, 76, 76)",   // light red
-    "rgb(255, 0, 0)",     // red
-    "rgb(178, 0, 0)",     // dark red
-    "rgb(255, 255, 76)",  // ight yellow
-    "rgb(255, 255, 0)",   // yellow
-    "rgb(178, 178, 0)",   // dark yellow
-    "rgb(76, 76, 255)",   // light blue
-    "rgb(0, 0, 255)",     // blue
-    "rgb(0, 0, 178)",     // dark blue
-    "rgb(76, 166, 76)",   // light green
-    "rgb(0, 128, 0)",     // green
-    "rgb(0, 89, 0)",      // dark green
-    "rgb(255, 190, 76)",  // light orange
-    "rgb(255, 165, 0)",   // orange
-    "rgb(178, 115, 0)",   // dark orange
-    "rgb(166, 76, 166)",  // light purple
-    "rgb(128, 0, 128)",   // purple
-    "rgb(89, 0, 89)",     // dark purple
-
-  ]);
-
-
-  const drawGrid = () => {
-    const lines = [];
-
-    for (let i = 0; i <= numCols; i++) {
-      lines.push(
-        <Line
-          key={`v-${i}`}
-          points={[i * tileSize, 0, i * tileSize, numRows * tileSize]}
-          stroke="gray"
-        />
-      );
-    }
-
-    for (let i = 0; i <= numRows; i++) {
-      lines.push(
-        <Line
-          key={`h-${i}`}
-          points={[0, i * tileSize, numCols * tileSize, i * tileSize]}
-          stroke="gray"
-        />
-      );
-    }
-
-    return lines;
-  };
-
+  //#endregion
 
   return (
     <>
-      {/* Paleta */}
-      <div style={{ marginBottom: 10 }}>
-        {colors.map((color, index) => (
-          <button
-            key={index}
-            onClick={() => setSelectedColor(color)}
-            onContextMenu={(e) => handleContextMenu(e, index)}
-            style={{
-              backgroundColor: color,
-              border: selectedColor === color ? "3px solid black" : "1px solid gray",
-              width: 30,
-              height: 30,
-              marginRight: 5,
-              cursor: "pointer",
-            }}
-            aria-label={`Select color ${color}`}
-          />
-        ))}
-      </div>
-
-      {/* Picker oculto pero posicionado */}
-      <input
-        ref={inputRef}
-        type="color"
-        style={{
-          position: "fixed",
-          zIndex: 1000,
-          left: pickerStyle.left,
-          top: pickerStyle.top,
-          opacity: 0,
-          width: 30,
-          height: 30,
-          border: "none",
-          visibility: pickerStyle.visibility,
-        }}
-        value={pickerIndex !== null ? rgbToHex(colors[pickerIndex]) : "#ffffff"}
-        onChange={handleColorChange}
-        onBlur={() => {
-          setPickerIndex(null);
-          setPickerStyle((prev) => ({ ...prev, visibility: "hidden" }));
-        }}
+      <ColorPalette
+        colors={paletteColors}
+        selectedColor={selectedColor}
+        onColorChange={setSelectedColor}
+        setColors={setPaletteColors}
       />
 
       <input
@@ -1183,7 +1140,7 @@ export default function GridAdaptativo() {
             ref={transformerRef}
             rotateEnabled={true}
             enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
-            boundBoxFunc={(oldBox, newBox) => {
+            boundBoxFunc={(newBox) => {
               const size = Math.max(newBox.width, newBox.height);
               return {
                 x: newBox.x,
