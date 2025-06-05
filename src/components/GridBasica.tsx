@@ -86,22 +86,17 @@ export default function GridAdaptativo() {
   const [laserMode, setLaserMode] = useState(false);
   const lastLaserPoint = useRef<{ x: number; y: number } | null>(null);
   type TrailPoint = { x: number; y: number; time: number };
-  const [laserTrail, setLaserTrail] = useState<TrailPoint[]>([]);
+  const [laserPath, setLaserPath] = useState<{ x: number; y: number; time: number }[]>([]);
 
   useEffect(() => {
     if (!laserMode) return;
 
-    let animationFrameId: number;
-
-    const updateTrail = () => {
+    const interval = setInterval(() => {
       const now = Date.now();
-      setLaserTrail((prev) => prev.filter((p) => now - p.time < 500)); // 0.5s
-      animationFrameId = requestAnimationFrame(updateTrail);
-    };
+      setLaserPath((prev) => prev.filter((p) => now - p.time < 500));
+    }, 50);
 
-    updateTrail();
-
-    return () => cancelAnimationFrame(animationFrameId);
+    return () => clearInterval(interval);
   }, [laserMode]);
 
   //AREAS
@@ -401,20 +396,13 @@ export default function GridAdaptativo() {
 
   const handleMouseMove = (e: any) => {
     if (laserMode) {
-    const pos = e.target.getStage()?.getPointerPosition();
-    if (pos) {
-      const now = Date.now();
-
-      // Solo agregamos un nuevo punto si nos movimos lo suficiente
-      const minDistance = 0;
-      const last = lastLaserPoint.current;
-      if (!last || Math.hypot(last.x - pos.x, last.y - pos.y) > minDistance) {
-        setLaserTrail((prev) => [...prev, { x: pos.x, y: pos.y, time: now }]);
-        lastLaserPoint.current = pos;
+      const pos = e.target.getStage()?.getPointerPosition();
+      if (pos) {
+        const now = Date.now();
+        setLaserPath((prev) => [...prev, { x: pos.x, y: pos.y, time: now }]);
       }
+      return;
     }
-    return;
-  }
 
     if (paintEdgesMode && isDrawingEdge) {
       const mousePos = e.target.getStage().getPointerPosition();
@@ -1197,21 +1185,20 @@ export default function GridAdaptativo() {
             }}
           />
 
-          {laserMode &&
-            laserTrail.map((point, index) => {
-              const age = Date.now() - point.time;
-              const alpha = 1 - age / 500;
-              return (
-                <Circle
-                  key={index}
-                  x={point.x}
-                  y={point.y}
-                  radius={6}
-                  fill={`rgba(255, 0, 0, ${alpha})`}
-                  shadowBlur={15}
-                />
-              );
-            })}
+          {laserMode && laserPath.length > 1 && (
+            <Line
+              points={laserPath.flatMap((p) => [p.x, p.y])}
+              stroke="red"
+              strokeWidth={4}
+              lineCap="round"
+              lineJoin="round"
+              tension={0.4} // suaviza la curva
+              opacity={0.5}
+              shadowColor="red"
+              shadowBlur={20}
+              shadowOpacity={0.6}
+            />
+          )}
 
         </Layer>
       </Stage>
