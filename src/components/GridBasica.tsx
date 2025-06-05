@@ -68,6 +68,10 @@ export default function GridAdaptativo() {
   const [pickerIndex, setPickerIndex] = useState<number | null>(null);
   const [pickerStyle, setPickerStyle] = useState({ top: 0, left: 0, visibility: "hidden" as "hidden" | "visible" });
 
+  //Pintar en area
+  const [isShiftDown, setIsShiftDown] = useState(false);
+  const [rectPaintStart, setRectPaintStart] = useState<{ x: number; y: number } | null>(null);
+
   const posKey = (x: number, y: number) => `${x},${y}`;
 
   //AREAS
@@ -121,6 +125,26 @@ export default function GridAdaptativo() {
       }
     }
   }, [areaShapes, selectedAreaId]);
+
+
+  //Apretar el shift
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.shiftKey) setIsShiftDown(true);
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (!e.shiftKey) {
+        setIsShiftDown(false);
+        setRectPaintStart(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, []);
 
 
   const handleContextMenu = (e: React.MouseEvent, index: number) => {
@@ -298,7 +322,11 @@ export default function GridAdaptativo() {
     if (!mousePos) return;
     const x = Math.floor(mousePos.x / tileSize);
     const y = Math.floor(mousePos.y / tileSize);
-    paintTile(x, y);
+    if (isShiftDown) {
+      setRectPaintStart({ x, y });
+    } else {
+      paintTile(x, y);
+    }
   };
 
   const handleMouseMove = (e: any) => {
@@ -317,7 +345,20 @@ export default function GridAdaptativo() {
     if (!mousePos) return;
     const x = Math.floor(mousePos.x / tileSize);
     const y = Math.floor(mousePos.y / tileSize);
-    paintTile(x, y);
+
+    if (isShiftDown && rectPaintStart) {
+      const x1 = Math.min(rectPaintStart.x, x);
+      const x2 = Math.max(rectPaintStart.x, x);
+      const y1 = Math.min(rectPaintStart.y, y);
+      const y2 = Math.max(rectPaintStart.y, y);
+      for (let i = x1; i <= x2; i++) {
+        for (let j = y1; j <= y2; j++) {
+          paintTile(i, j);
+        }
+      }
+    } else {
+      paintTile(x, y);
+    }
   };
 
   const handleMouseUp = () => {
@@ -328,6 +369,7 @@ export default function GridAdaptativo() {
       setMeasureEnd(null);
       return;
     }
+    setRectPaintStart(null);
   };
 
 
