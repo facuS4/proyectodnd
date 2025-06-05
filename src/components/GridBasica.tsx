@@ -82,6 +82,28 @@ export default function GridAdaptativo() {
 
   const posKey = (x: number, y: number) => `${x},${y}`;
 
+  //Laser
+  const [laserMode, setLaserMode] = useState(false);
+  const lastLaserPoint = useRef<{ x: number; y: number } | null>(null);
+  type TrailPoint = { x: number; y: number; time: number };
+  const [laserTrail, setLaserTrail] = useState<TrailPoint[]>([]);
+
+  useEffect(() => {
+    if (!laserMode) return;
+
+    let animationFrameId: number;
+
+    const updateTrail = () => {
+      const now = Date.now();
+      setLaserTrail((prev) => prev.filter((p) => now - p.time < 500)); // 0.5s
+      animationFrameId = requestAnimationFrame(updateTrail);
+    };
+
+    updateTrail();
+
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [laserMode]);
+
   //AREAS
   const transformerRef = useRef<any>(null);
   const shapeRefs = useRef<Map<string, any>>(new Map());
@@ -296,15 +318,6 @@ export default function GridAdaptativo() {
   // Manejo de eventos del mouse
   // para pintar casillas
   const handleMouseDown = (e: any) => {
-    if (moveMode && isShiftDown) {
-      const stage = e.target.getStage();
-      const pos = stage?.getPointerPosition();
-      if (pos) {
-        setSelectionStart(pos);
-        setSelectionRect({ x: pos.x, y: pos.y, width: 0, height: 0 });
-      }
-    }
-
     if (measureMode) {
       const mousePos = e.target.getStage().getPointerPosition();
       if (mousePos) {
@@ -387,6 +400,22 @@ export default function GridAdaptativo() {
   };
 
   const handleMouseMove = (e: any) => {
+    if (laserMode) {
+    const pos = e.target.getStage()?.getPointerPosition();
+    if (pos) {
+      const now = Date.now();
+
+      // Solo agregamos un nuevo punto si nos movimos lo suficiente
+      const minDistance = 0;
+      const last = lastLaserPoint.current;
+      if (!last || Math.hypot(last.x - pos.x, last.y - pos.y) > minDistance) {
+        setLaserTrail((prev) => [...prev, { x: pos.x, y: pos.y, time: now }]);
+        lastLaserPoint.current = pos;
+      }
+    }
+    return;
+  }
+
     if (paintEdgesMode && isDrawingEdge) {
       const mousePos = e.target.getStage().getPointerPosition();
       if (!mousePos) return;
@@ -755,6 +784,23 @@ export default function GridAdaptativo() {
         }}
       >
         {measureMode ? "Desactivar Medición" : "Medir Distancia"}
+      </button>
+
+      <button
+        onClick={() => {
+          setLaserMode((prev) => !prev);
+          setPaintMode(false);
+          setMoveMode(false);
+          setMeasureMode(false);
+          setPaintEdgesMode(false);
+        }}
+        style={{
+          backgroundColor: laserMode ? "lightblue" : "lightgray",
+          padding: "5px 10px",
+          marginLeft: 10,
+        }}
+      >
+        {laserMode ? "Desactivar Láser" : "Activar Láser"}
       </button>
 
       <button
@@ -1150,6 +1196,22 @@ export default function GridAdaptativo() {
               };
             }}
           />
+
+          {laserMode &&
+            laserTrail.map((point, index) => {
+              const age = Date.now() - point.time;
+              const alpha = 1 - age / 500;
+              return (
+                <Circle
+                  key={index}
+                  x={point.x}
+                  y={point.y}
+                  radius={6}
+                  fill={`rgba(255, 0, 0, ${alpha})`}
+                  shadowBlur={15}
+                />
+              );
+            })}
 
         </Layer>
       </Stage>
