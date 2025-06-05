@@ -3,7 +3,7 @@ import { useRef, useState, useEffect } from "react";
 import { Circle, Text, Image } from "react-konva";
 import CircularToken from "./CircularTokenProps";
 import AudioPanel from "./AudioPanel";
-import  {DiceRoller} from "./diceroller";
+import { DiceRoller } from "./diceroller";
 
 export default function GridAdaptativo() {
   const baseTileSize = 50; // Tamaño base de la casilla
@@ -33,6 +33,12 @@ export default function GridAdaptativo() {
   const [paintMode, setPaintMode] = useState(false);
   const [moveMode, setMoveMode] = useState(false);
   const [isDraggingPlayer, setIsDraggingPlayer] = useState(false);
+
+  //Estados regla
+  const [measureMode, setMeasureMode] = useState(false);
+  const [measureStart, setMeasureStart] = useState<{ x: number; y: number } | null>(null);
+  const [measureEnd, setMeasureEnd] = useState<{ x: number; y: number } | null>(null);
+
 
   //Cambiar cosas del token
   const [contextMenuVisible, setContextMenuVisible] = useState(false);
@@ -200,6 +206,17 @@ export default function GridAdaptativo() {
   // Manejo de eventos del mouse
   // para pintar casillas
   const handleMouseDown = (e: any) => {
+    if (measureMode) {
+      const mousePos = e.target.getStage().getPointerPosition();
+      if (mousePos) {
+        const x = Math.floor(mousePos.x / tileSize);
+        const y = Math.floor(mousePos.y / tileSize);
+        setMeasureStart({ x, y });
+        setMeasureEnd({ x, y });
+      }
+      return;
+    }
+
     if (!paintMode) return;
     setIsDrawing(true);
     const mousePos = e.target.getStage().getPointerPosition();
@@ -211,6 +228,14 @@ export default function GridAdaptativo() {
 
   const handleMouseMove = (e: any) => {
     // Si no estamos en modo pintura, no hacemos nada
+    if (measureMode && measureStart) {
+      const mousePos = e.target.getStage().getPointerPosition();
+      if (mousePos) {
+        const x = Math.floor(mousePos.x / tileSize);
+        const y = Math.floor(mousePos.y / tileSize);
+        setMeasureEnd({ x, y });
+      }
+    }
     if (!paintMode) return;
     if (!isDrawing) return;
     const mousePos = e.target.getStage().getPointerPosition();
@@ -222,6 +247,12 @@ export default function GridAdaptativo() {
 
   const handleMouseUp = () => {
     setIsDrawing(false);
+    if (measureMode && measureStart && measureEnd) {
+      // Mantiene la línea dibujada o limpia si preferís
+      setMeasureStart(null);
+      setMeasureEnd(null);
+      return;
+    }
   };
 
 
@@ -444,6 +475,25 @@ export default function GridAdaptativo() {
         Agregar Token
       </button>
 
+      <button
+        onClick={() => {
+          setMeasureMode((prev) => !prev);
+          setMeasureStart(null);
+          setMeasureEnd(null);
+          setPaintMode(false); // desactiva pintar
+          setMoveMode(false); // desactiva mover
+        }}
+        style={{
+          backgroundColor: measureMode ? "lightblue" : "lightgray",
+          padding: "5px 10px",
+          cursor: "pointer",
+          marginLeft: 10,
+        }}
+      >
+        {measureMode ? "Desactivar Medición" : "Medir Distancia"}
+      </button>
+
+
 
       <Stage
         width={gridWidth}
@@ -488,6 +538,50 @@ export default function GridAdaptativo() {
               />
             );
           })}
+
+          {/* Regla */}
+          {measureMode && measureStart && measureEnd && (
+            <>
+              <Line
+                points={[
+                  measureStart.x * tileSize + tileSize / 2,
+                  measureStart.y * tileSize + tileSize / 2,
+                  measureEnd.x * tileSize + tileSize / 2,
+                  measureEnd.y * tileSize + tileSize / 2,
+                ]}
+                stroke="black"
+                strokeWidth={2}
+                dash={[10, 5]}
+              />
+              <Text
+                x={((measureStart.x + measureEnd.x) / 2) * tileSize}
+                y={((measureStart.y + measureEnd.y) / 2) * tileSize}
+                text={`${Math.round(
+                  Math.sqrt(
+                    Math.pow(measureEnd.x - measureStart.x, 2) +
+                    Math.pow(measureEnd.y - measureStart.y, 2)
+                  ) * 5
+                )} pies`}
+                fontSize={14}
+                fill="black"
+              />
+              {/* Circunferencia de radio igual a la distancia */}
+              <Circle
+                x={measureStart.x * tileSize + tileSize / 2}
+                y={measureStart.y * tileSize + tileSize / 2}
+                radius={
+                  Math.sqrt(
+                    Math.pow(measureEnd.x - measureStart.x, 2) +
+                    Math.pow(measureEnd.y - measureStart.y, 2)
+                  ) * tileSize
+                }
+                stroke="black"
+                strokeWidth={1}
+                dash={[5, 5]}
+                opacity={0.5}
+              />
+            </>
+          )}
 
           {/* Rect cursor */}
 
