@@ -9,45 +9,88 @@ const clients = new Set<WebSocket>();
 
 // Estado compartido del grid
 let paintedTiles: Record<string, string> = {};
+let tokens: Record<string, {
+    id: string;
+    x: number;
+    y: number;
+    radius: number;
+    color: string;
+    nombre: string;
+    vida: string;
+}> = {};
+
 
 wss.on("connection", (ws) => {
-  clients.add(ws);
+    clients.add(ws);
 
-  // Enviar estado inicial
-  ws.send(
-    JSON.stringify({
-      type: "INIT_STATE",
-      payload: {
-        paintedTiles,
-      },
-    })
-  );
+    // Enviar estado inicial de tiles 
+    ws.send(
+        JSON.stringify({
+            type: "INIT_STATE",
+            payload: {
+                paintedTiles,
+            },
+        })
+    );
 
-  ws.on("message", (data) => {
-    const message = JSON.parse(data.toString());
+    // Enviar estado inicial de tokens
+    ws.send(
+        JSON.stringify({
+            type: "INIT_TOKENS",
+            payload: tokens, // ahora tiene toda la info
+        })
+    );
 
-    // Guardar tile pintado
-    if (message.type === "PAINT_TILE") {
-      const { x, y, color } = message.payload;
-      const key = `${x},${y}`;
-      if (color === "rgb(255, 255, 255)") {
-        delete paintedTiles[key];
-      } else {
-        paintedTiles[key] = color;
-      }
-    }
+    ws.on("message", (data) => {
+        const message = JSON.parse(data.toString());
 
-    // Broadcast
-    for (const client of clients) {
-      if (client !== ws && client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify(message));
-      }
-    }
-  });
+        // Guardar tile pintado
+        if (message.type === "PAINT_TILE") {
+            const { x, y, color } = message.payload;
+            const key = `${x},${y}`;
+            if (color === "rgb(255, 255, 255)") {
+                delete paintedTiles[key];
+            } else {
+                paintedTiles[key] = color;
+            }
+        }
 
-  ws.on("close", () => {
-    clients.delete(ws);
-  });
+        if (message.type === "ADD_TOKEN") {
+            const { id, x, y, radius, color, nombre, vida } = message.payload;
+
+            // Guardar todos los datos del token
+            tokens[id] = { id, x, y, radius, color, nombre, vida };
+        }
+
+        if (message.type === "MOVE_TOKEN") {
+            const { id, x, y } = message.payload;
+
+            if (tokens[id]) {
+                tokens[id].x = x;
+                tokens[id].y = y;
+            }
+        }
+
+        if (message.type === "RESIZE_TOKEN") {
+            const { id, x, y, radius } = message.payload;
+            if (tokens[id]) {
+                tokens[id].x = x;
+                tokens[id].y = y;
+                tokens[id].radius = radius;
+            }
+        }
+
+        // Broadcast
+        for (const client of clients) {
+            if (client !== ws && client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify(message));
+            }
+        }
+    });
+
+    ws.on("close", () => {
+        clients.delete(ws);
+    });
 });
 
 console.log("Servidor WebSocket en puerto 3001");

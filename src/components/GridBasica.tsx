@@ -121,6 +121,20 @@ export default function GridAdaptativo() {
       image: null,
     };
     setTokens(prev => [...prev, newToken]);
+
+    //Enviar evento al servidor
+    socket.send(JSON.stringify({
+      type: "ADD_TOKEN",
+      payload: {
+        id,
+        x: newToken.x,
+        y: newToken.y,
+        radius: newToken.radius,
+        color: newToken.color,
+        nombre: newToken.nombre,
+        vida: newToken.vida,
+      }
+    }));
   };
 
   //Agrandar y Reducir el token
@@ -128,47 +142,49 @@ export default function GridAdaptativo() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!selectedTokenId) return;
 
-      setTokens((prevTokens) =>
-        prevTokens.map((token) => {
-          if (token.id !== selectedTokenId) return token;
+      if (e.key.toLowerCase() === "r" || e.key.toLowerCase() === "f") {
+        setTokens((tokens) => {
+          return tokens.map((token) => {
+            if (token.id !== selectedTokenId) return token;
 
-
-          if (selectedTokenId) {
+            let newRadius = token.radius;
             if (e.key.toLowerCase() === "r") {
-              setTokens(tokens =>
-                tokens.map(token => {
-                  if (token.id === selectedTokenId) {
-                    const newRadius = Math.min(token.radius + tokenSize, tileSize * 2);
-                    const snapped = snapToGrid(token.x, token.y, newRadius);
-                    return { ...token, radius: newRadius, x: snapped.x, y: snapped.y };
-                  }
-                  return token;
-                })
-              );
+              newRadius = Math.min(token.radius + tokenSize, tileSize * 2);
             }
-
             if (e.key.toLowerCase() === "f") {
-              setTokens(tokens =>
-                tokens.map(token => {
-                  if (token.id === selectedTokenId) {
-                    const newRadius = Math.max(token.radius - tokenSize, tileSize / 2);
-                    const snapped = snapToGrid(token.x, token.y, newRadius);
-                    return { ...token, radius: newRadius, x: snapped.x, y: snapped.y };
-                  }
-                  return token;
-                })
-              );
+              newRadius = Math.max(token.radius - tokenSize, tileSize / 2);
             }
-          } // cierre de if selectedTokenId
 
-          return token; // Retorna el token sin cambios si no es el seleccionado
-        })
-      );
+            const snapped = snapToGrid(token.x, token.y, newRadius);
+            const updatedToken = {
+              ...token,
+              radius: newRadius,
+              x: snapped.x,
+              y: snapped.y,
+            };
+
+            // Emitimos por WebSocket
+            socket.send(
+              JSON.stringify({
+                type: "RESIZE_TOKEN",
+                payload: {
+                  id: updatedToken.id,
+                  x: updatedToken.x,
+                  y: updatedToken.y,
+                  radius: updatedToken.radius,
+                },
+              })
+            );
+
+            return updatedToken;
+          });
+        });
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedTokenId, numCols, numRows, tileSize]);
+  }, [selectedTokenId, tileSize]);
 
   //#endregion
 
@@ -385,6 +401,17 @@ export default function GridAdaptativo() {
           const newX = pos.x + dx;
           const newY = pos.y + dy;
           const snapped = snapToGrid(newX, newY, token.radius);
+
+          // Emitimos el movimiento
+          socket.send(JSON.stringify({
+            type: "MOVE_TOKEN",
+            payload: {
+              id: token.id,
+              x: snapped.x,
+              y: snapped.y,
+            },
+          }));
+
           return { ...token, x: snapped.x, y: snapped.y };
         }
         return token;
@@ -632,41 +659,96 @@ export default function GridAdaptativo() {
   //#region SOCKETS
 
   useEffect(() => {
-  socket.onmessage = async (event) => {
-    try {
-      const text = await (event.data instanceof Blob ? event.data.text() : event.data);
-      const data = JSON.parse(text);
+    socket.onmessage = async (event) => {
+      try {
+        const text = await (event.data instanceof Blob ? event.data.text() : event.data);
+        const data = JSON.parse(text);
 
-      switch (data.type) {
-        case "INIT_STATE":
-          setPaintedTiles(() => {
-            const newMap = new Map<string, string>();
-            for (const key in data.payload.paintedTiles) {
-              newMap.set(key, data.payload.paintedTiles[key]);
-            }
-            return newMap;
-          });
-          break;
+        switch (data.type) {
+          case "INIT_STATE":
+            setPaintedTiles(() => {
+              const newMap = new Map<string, string>();
+              for (const key in data.payload.paintedTiles) {
+                newMap.set(key, data.payload.paintedTiles[key]);
+              }
+              return newMap;
+            });
+            break;
 
-        case "PAINT_TILE":
-          const { x, y, color } = data.payload;
-          setPaintedTiles((prev) => {
-            const newMap = new Map(prev);
-            const key = `${x},${y}`;
-            if (color === "rgb(255, 255, 255)") {
-              newMap.delete(key);
-            } else {
-              newMap.set(key, color);
-            }
-            return newMap;
-          });
-          break;
+
+          case "INIT_TOKENS":
+            setTokens(() => Object.values(data.payload).map((t: any) => ({
+              ...t,
+              image: null // las imágenes siguen siendo locales
+            })));
+            break;
+
+          case "PAINT_TILE":
+            const { x, y, color } = data.payload;
+            setPaintedTiles((prev) => {
+              const newMap = new Map(prev);
+              const key = `${x},${y}`;
+              if (color === "rgb(255, 255, 255)") {
+                newMap.delete(key);
+              } else {
+                newMap.set(key, color);
+              }
+              return newMap;
+            });
+            break;
+
+          case "ADD_TOKEN":
+            setTokens((prev) => {
+              // Evitar duplicados
+              if (prev.some(t => t.id === data.payload.id)) return prev;
+
+              return [
+                ...prev,
+                {
+                  id: data.payload.id,
+                  x: data.payload.x,
+                  y: data.payload.y,
+                  radius: data.payload.radius,
+                  color: data.payload.color,
+                  nombre: data.payload.nombre,
+                  vida: data.payload.vida,
+                  image: null // 🔸 Las imágenes no se comparten por WebSocket, al menos no por ahora
+                }
+              ];
+            });
+            break;
+
+          case "MOVE_TOKEN":
+            setTokens((prev) =>
+              prev.map((t) =>
+                t.id === data.payload.id
+                  ? { ...t, x: data.payload.x, y: data.payload.y }
+                  : t
+              )
+            );
+            break;
+
+
+          case "RESIZE_TOKEN":
+            setTokens((prev) =>
+              prev.map((t) =>
+                t.id === data.payload.id
+                  ? {
+                    ...t,
+                    x: data.payload.x,
+                    y: data.payload.y,
+                    radius: data.payload.radius,
+                  }
+                  : t
+              )
+            );
+            break;
+        }
+      } catch (err) {
+        console.error("Error al parsear mensaje WebSocket:", err);
       }
-    } catch (err) {
-      console.error("Error al parsear mensaje WebSocket:", err);
-    }
-  };
-}, []);
+    };
+  }, []);
 
   //#endregion
   return (
