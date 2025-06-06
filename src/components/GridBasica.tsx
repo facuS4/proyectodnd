@@ -1458,25 +1458,30 @@ export default function GridAdaptativo() {
       </div>
 
       {/* Dice Roller */}
-      <div className="absolute bottom-4 right-4 z-10">
-        <Popover placement="top">
-          <PopoverTrigger>
-            <Button 
-              color="primary" 
-              startContent={<Icon icon="lucide:dice" width={20} />}
-              className="px-6 shadow-md"
-              size="lg"
-            >
-              Roll Dice
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="p-0 w-[300px]">
-            <DiceRoller onRollComplete={(value, diceType, modifier, total) => {
-              console.log(`Roll result: ${value} ${diceType} ${modifier > 0 ? '+' : ''}${modifier} = ${total}`);
-            }} />
-          </PopoverContent>
-        </Popover>
-      </div>
+<div className="absolute bottom-4 right-4 z-10">
+  <Popover placement="top">
+    <PopoverTrigger>
+      <Button
+        isIconOnly
+        variant="shadow"
+        color="primary"
+        className="w-12 h-12 rounded-full shadow-lg hover:scale-105 transition-transform duration-200"
+        aria-label="Lanzar dado"
+      >
+        <Icon icon="fa-solid:dice-d20" width={24} height={24} />
+      </Button>
+    </PopoverTrigger>
+    <PopoverContent className="p-0 w-[300px]">
+      <DiceRoller
+        onRollComplete={(value, diceType, modifier, total) => {
+          console.log(
+            `Roll result: ${value} ${diceType} ${modifier > 0 ? '+' : ''}${modifier} = ${total}`
+          );
+        }}
+      />
+    </PopoverContent>
+  </Popover>
+</div>
 
       {/* Keyboard Shortcuts Info */}
       <div className="absolute bottom-4 left-4 z-10">
