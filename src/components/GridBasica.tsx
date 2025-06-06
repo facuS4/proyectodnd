@@ -6,6 +6,7 @@ import AudioPanel from "./AudioPanel";
 import { DiceRoller } from "./diceroller";
 import React from "react";
 import ColorPalette from "./ColorPalette";
+import socket from "../utils/socket";
 
 export default function GridAdaptativo() {
 
@@ -221,18 +222,26 @@ export default function GridAdaptativo() {
   const paintTile = (x: number, y: number) => {
     if (x < 0 || x >= numCols || y < 0 || y >= numRows) return;
 
+    const key = posKey(x, y);
+
     setPaintedTiles((prev) => {
       const newMap = new Map(prev);
-      const key = posKey(x, y);
 
       if (selectedColor === "rgb(255, 255, 255)") {
-        newMap.delete(key); // Elimina la casilla si se pinta con blanco
+        newMap.delete(key);
       } else {
-        newMap.set(key, selectedColor); // Si no es blanco, pinta normalmente
+        newMap.set(key, selectedColor);
       }
 
       return newMap;
     });
+
+    socket.send(
+      JSON.stringify({
+        type: "PAINT_TILE",
+        payload: { x, y, color: selectedColor },
+      })
+    );
   };
 
   // Cambiar paintMode
@@ -620,6 +629,46 @@ export default function GridAdaptativo() {
 
   //#endregion
 
+  //#region SOCKETS
+
+  useEffect(() => {
+  socket.onmessage = async (event) => {
+    try {
+      const text = await (event.data instanceof Blob ? event.data.text() : event.data);
+      const data = JSON.parse(text);
+
+      switch (data.type) {
+        case "INIT_STATE":
+          setPaintedTiles(() => {
+            const newMap = new Map<string, string>();
+            for (const key in data.payload.paintedTiles) {
+              newMap.set(key, data.payload.paintedTiles[key]);
+            }
+            return newMap;
+          });
+          break;
+
+        case "PAINT_TILE":
+          const { x, y, color } = data.payload;
+          setPaintedTiles((prev) => {
+            const newMap = new Map(prev);
+            const key = `${x},${y}`;
+            if (color === "rgb(255, 255, 255)") {
+              newMap.delete(key);
+            } else {
+              newMap.set(key, color);
+            }
+            return newMap;
+          });
+          break;
+      }
+    } catch (err) {
+      console.error("Error al parsear mensaje WebSocket:", err);
+    }
+  };
+}, []);
+
+  //#endregion
   return (
     <>
       <ColorPalette
