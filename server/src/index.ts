@@ -1,6 +1,9 @@
 import WebSocket, { WebSocketServer } from "ws";
 
-const wss = new WebSocketServer({ port: 3001 });
+const port = process.env.PORT || 3001;
+const wss = new WebSocketServer({ port: Number(port) });
+console.log(`Servidor WebSocket escuchando en puerto ${port}`);
+
 
 const clients = new Set<WebSocket>();
 
