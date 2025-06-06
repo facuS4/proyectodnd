@@ -1,5 +1,5 @@
 import React from "react";
-import { Card, CardBody, CardHeader, Button, Input } from "@heroui/react";
+import { Button, Input, ScrollShadow } from "@heroui/react";
 import { Icon } from "@iconify/react";
 
 interface DiceRollerProps {
@@ -201,10 +201,10 @@ export const DiceRoller: React.FC<DiceRollerProps> = ({ onRollComplete }) => {
 
   const renderDiceGrid = () => {
     return (
-      <div className="grid grid-cols-2 gap-4 w-full">
+      <div className="grid grid-cols-3 gap-3 w-full">
         {diceOptions.map((dice) => (
           <div key={dice.value} className="flex flex-col items-center">
-            <div className="mb-2 text-sm font-medium">{dice.label}</div>
+            <div className="mb-1 text-xs font-medium">{dice.label}</div>
             <div className="relative">
               <div 
                 className="cursor-pointer" 
@@ -216,8 +216,8 @@ export const DiceRoller: React.FC<DiceRollerProps> = ({ onRollComplete }) => {
               >
                 {renderDiceShape(dice.value)}
               </div>
-              <div className="mt-2 flex items-center justify-center">
-                <span className="text-center font-medium">
+              <div className="mt-1 flex items-center justify-center">
+                <span className="text-center text-xs font-medium">
                   {diceCounts[dice.value] > 0 ? `${diceCounts[dice.value]}x` : "0"}
                 </span>
               </div>
@@ -232,15 +232,15 @@ export const DiceRoller: React.FC<DiceRollerProps> = ({ onRollComplete }) => {
     const color = getDiceColor(diceType);
     const baseStyle = {
       position: "relative" as const,
-      width: "60px",
-      height: "60px",
+      width: "40px", // Reduced from 60px
+      height: "40px", // Reduced from 60px
       transformStyle: "preserve-3d" as const,
       transform: isAnimating && animatingDice.includes(diceType)
         ? `rotateX(${rotateX}deg) rotateY(${rotateY}deg) rotateZ(${rotateZ}deg)` 
         : "rotateX(0deg) rotateY(0deg) rotateZ(0deg)",
       boxShadow: diceCounts[diceType] > 0 
-        ? "0 4px 12px rgba(0,0,0,0.2)" 
-        : "0 2px 6px rgba(0,0,0,0.1)",
+        ? "0 2px 8px rgba(0,0,0,0.2)" // Reduced shadow
+        : "0 1px 4px rgba(0,0,0,0.1)", // Reduced shadow
       opacity: diceCounts[diceType] > 0 ? 1 : 0.7,
     };
     
@@ -255,18 +255,18 @@ export const DiceRoller: React.FC<DiceRollerProps> = ({ onRollComplete }) => {
                 ...baseStyle,
                 width: "0",
                 height: "0",
-                borderLeft: "30px solid transparent",
-                borderRight: "30px solid transparent",
-                borderBottom: `52px solid ${color}`,
+                borderLeft: "20px solid transparent", // Reduced from 30px
+                borderRight: "20px solid transparent", // Reduced from 30px
+                borderBottom: `35px solid ${color}`, // Reduced from 52px
               }}
             >
               {showResult && diceCounts[diceType] === 1 && (
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 translate-y-0 text-white font-bold text-sm">
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 translate-y-0 text-white font-bold text-xs">
                   {rollResult[diceType][0]}
                 </div>
               )}
               {diceCounts[diceType] > 1 && (
-                <div className="absolute -top-2 -right-2 bg-foreground text-background rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
+                <div className="absolute -top-1 -right-1 bg-foreground text-background rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">
                   {diceCounts[diceType]}x
                 </div>
               )}
@@ -405,8 +405,8 @@ export const DiceRoller: React.FC<DiceRollerProps> = ({ onRollComplete }) => {
                   ...baseStyle,
                   clipPath: "polygon(50% 0%, 80% 30%, 100% 50%, 80% 70%, 50% 100%, 20% 70%, 0% 50%, 20% 30%)",
                   backgroundColor: color,
-                  width: "90px",
-                  height: "90px",
+                  width: "60px", // Reduced from 90px
+                  height: "60px", // Reduced from 90px
                 }}
               >
                 {showResult && diceCounts[diceType] === 1 && (
@@ -423,10 +423,10 @@ export const DiceRoller: React.FC<DiceRollerProps> = ({ onRollComplete }) => {
               <div 
                 style={{
                   position: "absolute",
-                  top: "-15px",
-                  right: "-15px",
-                  width: "40px",
-                  height: "40px",
+                  top: "-10px", // Reduced from -15px
+                  right: "-10px", // Reduced from -15px
+                  width: "25px", // Reduced from 40px
+                  height: "25px", // Reduced from 40px
                   borderRadius: "50%",
                   backgroundColor: "#7828c8",
                   display: "flex",
@@ -434,7 +434,7 @@ export const DiceRoller: React.FC<DiceRollerProps> = ({ onRollComplete }) => {
                   justifyContent: "center",
                   color: "white",
                   fontWeight: "bold",
-                  fontSize: "12px",
+                  fontSize: "10px", // Reduced from 12px
                 }}
               >
                 %
@@ -492,82 +492,86 @@ export const DiceRoller: React.FC<DiceRollerProps> = ({ onRollComplete }) => {
   };
 
   return (
-    <Card>
-      <CardHeader className="flex justify-between items-center">
-        <h2 className="text-lg font-medium">Dice Roller</h2>
-      </CardHeader>
-      <CardBody className="flex flex-col items-center gap-4">
-        {/* Render all dice types in a grid */}
-        {renderDiceGrid()}
-        
-        {/* Modifier input */}
-        <div className="w-full flex items-center gap-2">
-          <span className="text-sm whitespace-nowrap">Modifier:</span>
-          <Input
-            type="text"
-            value={modifier}
-            onValueChange={handleModifierChange}
-            placeholder="0"
-            size="sm"
-            startContent={<span className="text-default-400">{parseInt(modifier || "0") >= 0 ? "+" : ""}</span>}
-          />
-        </div>
-        
-        <Button 
-          color="primary" 
-          fullWidth
-          onPress={handleRoll}
-          isDisabled={rolling || !hasSelectedDice}
-          startContent={<Icon icon="lucide:dice" width={18} />}
-        >
-          {getRollDescription()}
-        </Button>
-        
-        {rollResult !== null && !rolling && (
-          <div className="mt-2 text-center w-full">
-            <p className="text-sm text-default-600">Results:</p>
-            
-            {/* Results by dice type */}
-            {Object.entries(rollResult).map(([diceType, results]) => (
-              results.length > 0 && (
-                <div key={diceType} className="mb-2">
-                  <p className="text-xs text-default-500">{diceType}:</p>
-                  <div className="flex flex-wrap gap-1 justify-center my-1">
-                    {results.map((result, index) => (
-                      <span 
-                        key={`${diceType}-${index}`} 
-                        className="px-2 py-1 bg-content2 rounded-md text-sm font-medium"
-                        style={{ borderLeft: `3px solid ${getDiceColor(diceType)}` }}
-                      >
-                        {result}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )
-            ))}
-            
-            {/* Sum of all dice */}
-            {Object.values(rollResult).flat().length > 1 && (
-              <p className="text-sm mt-1">
-                Sum: {Object.values(rollResult).flat().reduce((acc, val) => acc + val, 0)}
-              </p>
-            )}
-            
-            {/* Modifier */}
-            {modifier !== "0" && modifier !== "" && (
-              <p className="text-sm mt-1">
-                Modifier: {parseInt(modifier) > 0 ? `+${modifier}` : modifier}
-              </p>
-            )}
-            
-            {/* Total */}
-            <p className="text-xl font-bold mt-1">
-              Total: {calculateTotal()}
-            </p>
+    <div className="p-3"> {/* Reduced padding from p-4 */}
+      <div className="flex justify-between items-center mb-2"> {/* Reduced margin from mb-4 */}
+        <h2 className="text-base font-medium">Dice Roller</h2> {/* Reduced from text-lg */}
+      </div>
+      <ScrollShadow className="max-h-[350px]">
+        <div className="flex flex-col items-center gap-3"> {/* Reduced gap from gap-4 */}
+          {/* Render all dice types in a grid */}
+          {renderDiceGrid()}
+          
+          {/* Modifier input */}
+          <div className="w-full flex items-center gap-2">
+            <span className="text-xs whitespace-nowrap">Modifier:</span> {/* Reduced from text-sm */}
+            <Input
+              type="text"
+              value={modifier}
+              onValueChange={handleModifierChange}
+              placeholder="0"
+              size="sm"
+              className="text-xs" /* Added smaller text */
+              startContent={<span className="text-default-400 text-xs">{parseInt(modifier || "0") >= 0 ? "+" : ""}</span>}
+            />
           </div>
-        )}
-      </CardBody>
-    </Card>
+          
+          <Button 
+            color="primary" 
+            fullWidth
+            size="sm" /* Changed from default to small */
+            onPress={handleRoll}
+            isDisabled={rolling || !hasSelectedDice}
+            startContent={<Icon icon="lucide:dice" width={16} />} /* Reduced from 18 */
+          >
+            {getRollDescription()}
+          </Button>
+          
+          {rollResult !== null && !rolling && (
+            <div className="mt-1 text-center w-full"> {/* Reduced margin from mt-2 */}
+              <p className="text-xs text-default-600">Results:</p> {/* Reduced from text-sm */}
+              
+              {/* Results by dice type */}
+              {Object.entries(rollResult).map(([diceType, results]) => (
+                results.length > 0 && (
+                  <div key={diceType} className="mb-1"> {/* Reduced margin from mb-2 */}
+                    <p className="text-[10px] text-default-500">{diceType}:</p> {/* Reduced from text-xs */}
+                    <div className="flex flex-wrap gap-1 justify-center my-1">
+                      {results.map((result, index) => (
+                        <span 
+                          key={`${diceType}-${index}`} 
+                          className="px-1.5 py-0.5 bg-content2 rounded-md text-xs font-medium" /* Reduced padding and text size */
+                          style={{ borderLeft: `2px solid ${getDiceColor(diceType)}` }} /* Reduced from 3px */
+                        >
+                          {result}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )
+              ))}
+              
+              {/* Sum of all dice */}
+              {Object.values(rollResult).flat().length > 1 && (
+                <p className="text-xs mt-1"> {/* Reduced from text-sm */}
+                  Sum: {Object.values(rollResult).flat().reduce((acc, val) => acc + val, 0)}
+                </p>
+              )}
+              
+              {/* Modifier */}
+              {modifier !== "0" && modifier !== "" && (
+                <p className="text-xs mt-1"> {/* Reduced from text-sm */}
+                  Modifier: {parseInt(modifier) > 0 ? `+${modifier}` : modifier}
+                </p>
+              )}
+              
+              {/* Total */}
+              <p className="text-base font-bold mt-1"> {/* Reduced from text-xl */}
+                Total: {calculateTotal()}
+              </p>
+            </div>
+          )}
+        </div>
+      </ScrollShadow>
+    </div>
   );
 };

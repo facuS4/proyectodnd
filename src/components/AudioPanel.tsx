@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { Popover, PopoverTrigger, PopoverContent, Button } from "@heroui/react";
 import AudioManager from "./AudioManager";
 
 export default function AudioPanel() {
@@ -25,61 +26,79 @@ export default function AudioPanel() {
       audio.currentTime = 0;
       audioRefs.current.delete(id);
     }
-
     setActiveTracks((prev) => prev.filter((t) => t.id !== id));
   };
 
   return (
-    <div style={{ padding: 20, backgroundColor: "#f5f5f5", borderRadius: 8 }}>
-      <h3>🎵 Pistas Disponibles</h3>
-      {availableTracks.map((track) => (
-        <button
-          key={track.name}
-          onClick={() => addTrack(track)}
-          style={{
-            marginRight: 8,
-            marginBottom: 8,
-            padding: "6px 12px",
-            backgroundColor: "#ddd",
-            border: "none",
-            borderRadius: 4,
-            cursor: "pointer",
-          }}
+    <Popover placement="bottom">
+      <PopoverTrigger>
+        <Button
+          color="default"
+          variant="bordered"
+          className="flex items-center gap-2"
+          style={{ minWidth: 120 }}
         >
-          Agregar: {track.name}
-        </button>
-      ))}
+          🎵 Audio Panel
+        </Button>
+      </PopoverTrigger>
 
-      <hr style={{ margin: "16px 0" }} />
+      <PopoverContent className="p-4 w-80 max-w-full" style={{ maxHeight: 400, overflowY: "auto" }}>
+        <h3 style={{ marginBottom: 8 }}>🎵 Pistas Disponibles</h3>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+          {availableTracks.map((track) => (
+            <Button
+              key={track.name}
+              onClick={() => addTrack(track)}
+              variant="light"
+              size="sm"
+              style={{ flex: "1 1 45%" }}
+            >
+              Agregar: {track.name}
+            </Button>
+          ))}
+        </div>
 
-      <h3>🔊 Reproduciendo</h3>
-      {activeTracks.length === 0 && <p>No hay pistas activas.</p>}
-      {activeTracks.map((track) => (
-        <div key={track.id} style={{ marginBottom: 16 }}>
-          <strong>{track.name}</strong>
-          <button
-            onClick={() => removeTrack(track.id)}
+        <hr style={{ margin: "12px 0" }} />
+
+        <h3 style={{ marginBottom: 8 }}>🔊 Reproduciendo</h3>
+        {activeTracks.length === 0 && <p>No hay pistas activas.</p>}
+        {activeTracks.map((track) => (
+          <div
+            key={track.id}
             style={{
-              marginLeft: 10,
-              padding: "2px 6px",
-              backgroundColor: "#faa",
-              border: "none",
-              borderRadius: 4,
-              cursor: "pointer",
+              marginBottom: 12,
+              padding: 8,
+              backgroundColor: "#fff",
+              borderRadius: 6,
+              boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
             }}
           >
-            ❌
-          </button>
-          <AudioManager
-            src={track.src}
-            autoPlay
-            loop
-            onMount={(audio) => {
-              audioRefs.current.set(track.id, audio);
-            }}
-          />
-        </div>
-      ))}
-    </div>
+            <strong>{track.name}</strong>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <AudioManager
+                src={track.src}
+                loop
+                onMount={(audio) => {
+                  audioRefs.current.set(track.id, audio);
+                }}
+              />
+              <Button
+                color="danger"
+                variant="ghost"
+                size="sm"
+                onClick={() => removeTrack(track.id)}
+                style={{ minWidth: 30, padding: "2px 6px" }}
+                title="Eliminar pista"
+              >
+                ❌
+              </Button>
+            </div>
+          </div>
+        ))}
+      </PopoverContent>
+    </Popover>
   );
 }

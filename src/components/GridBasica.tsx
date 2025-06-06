@@ -7,6 +7,8 @@ import { DiceRoller } from "./diceroller";
 import React from "react";
 import ColorPalette from "./ColorPalette";
 import socket from "../utils/socket";
+import { Button, ButtonGroup, Popover, PopoverContent, PopoverTrigger, Tooltip, Divider } from "@heroui/react";
+import { Icon } from "@iconify/react";
 
 export default function GridAdaptativo() {
 
@@ -36,7 +38,8 @@ export default function GridAdaptativo() {
         <Line
           key={`v-${i}`}
           points={[i * tileSize, 0, i * tileSize, numRows * tileSize]}
-          stroke="gray"
+          stroke="rgba(128, 128, 128, 0.5)"
+          strokeWidth={0.5}
         />
       );
     }
@@ -46,7 +49,8 @@ export default function GridAdaptativo() {
         <Line
           key={`h-${i}`}
           points={[0, i * tileSize, numCols * tileSize, i * tileSize]}
-          stroke="gray"
+          stroke="rgba(128, 128, 128, 0.5)"
+          strokeWidth={0.5}
         />
       );
     }
@@ -752,663 +756,753 @@ export default function GridAdaptativo() {
 
   //#endregion
   return (
-    <>
-      <ColorPalette
-        colors={paletteColors}
-        selectedColor={selectedColor}
-        onColorChange={setSelectedColor}
-        setColors={setPaletteColors}
-      />
-
-      <input
-        type="file"
-        accept="image/*"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) {
-            const img = new window.Image();
-            img.src = URL.createObjectURL(file);
-            img.onload = () => {
-              // Crear un canvas auxiliar para rotar la imagen
-              const canvas = document.createElement("canvas");
-              canvas.width = img.height;
-              canvas.height = img.width;
-              const ctx = canvas.getContext("2d");
-
-              if (ctx) {
-                ctx.translate(canvas.width / 2, canvas.height / 2);
-                ctx.rotate(-Math.PI / 2); // rotar 90° antihorario
-                ctx.drawImage(img, -img.width / 2, -img.height / 2);
-              }
-
-              const rotatedImg = new window.Image();
-              rotatedImg.src = canvas.toDataURL();
-              rotatedImg.onload = () => {
-                setBackgroundImage(rotatedImg); // establecer la imagen ya rotada
-              };
-            };
-          }
-        }}
-        style={{ marginBottom: 10 }}
-      />
-
-      <AudioPanel></AudioPanel>
-
-      <button
-        onClick={togglePaintMode}
-        style={{
-          backgroundColor: paintMode ? "lightblue" : "lightgray",
-          padding: "5px 10px",
-          cursor: "pointer",
-          marginLeft: 10,
-        }}
-        aria-label={paintMode ? "Disable paint mode" : "Enable paint mode"}
-      >
-        {paintMode ? "Disable Paint Mode" : "Enable Paint Mode"}
-      </button>
-
-      <button
-        onClick={() => {
-          setPaintEdgesMode((prev) => {
-            if (!prev) {
-              setPaintMode(false);
-              setMoveMode(false);
-              setMeasureMode(false);
-              setAreaMode(false);
-            }
-            return !prev;
-          });
-        }}
-        style={{
-          backgroundColor: paintEdgesMode ? "lightblue" : "lightgray",
-          padding: "5px 10px",
-          marginLeft: 10,
-        }}
-      >
-        {paintEdgesMode ? "Desactivar Pintar Bordes" : "Pintar Bordes"}
-      </button>
-
-      <button
-        onClick={toggleMoveMode}
-        style={{
-          backgroundColor: moveMode ? "lightblue" : "lightgray",
-          padding: "5px 10px",
-          cursor: "pointer",
-          marginLeft: 10,
-        }}
-        aria-label={moveMode ? "Disable move mode" : "Enable move mode"}
-      >
-        {moveMode ? "Disable Move Mode" : "Enable Move Mode"}
-      </button>
-
-      <button
-        onClick={addNewToken}
-        style={{
-          backgroundColor: "lightgreen",
-          padding: "5px 10px",
-          cursor: "pointer",
-          marginBottom: 10,
-          marginLeft: 10,
-        }}
-      >
-        Agregar Token
-      </button>
-
-      <button
-        onClick={() => {
-          setMeasureMode((prev) => !prev);
-          setMeasureStart(null);
-          setMeasureEnd(null);
-          setPaintMode(false); // desactiva pintar
-          setMoveMode(false); // desactiva mover
-        }}
-        style={{
-          backgroundColor: measureMode ? "lightblue" : "lightgray",
-          padding: "5px 10px",
-          cursor: "pointer",
-          marginLeft: 10,
-        }}
-      >
-        {measureMode ? "Desactivar Medición" : "Medir Distancia"}
-      </button>
-
-      <button
-        onClick={() => {
-          setLaserMode((prev) => !prev);
-          setPaintMode(false);
-          setMoveMode(false);
-          setMeasureMode(false);
-          setPaintEdgesMode(false);
-        }}
-        style={{
-          backgroundColor: laserMode ? "lightblue" : "lightgray",
-          padding: "5px 10px",
-          marginLeft: 10,
-        }}
-      >
-        {laserMode ? "Desactivar Láser" : "Activar Láser"}
-      </button>
-
-      <button
-        onClick={() => {
-          setAreaMode("circle");
-          setPaintMode(false);
-          setMoveMode(false);
-          setMeasureMode(false);
-        }}
-        style={{
-          backgroundColor: areaMode === "circle" ? "lightblue" : "lightgray",
-          padding: "5px 10px",
-          marginLeft: 10,
-        }}
-      >
-        Colocar Círculo
-      </button>
-
-      <button
-        onClick={() => {
-          setAreaMode("square");
-          setPaintMode(false);
-          setMoveMode(false);
-          setMeasureMode(false);
-        }}
-        style={{
-          backgroundColor: areaMode === "square" ? "lightblue" : "lightgray",
-          padding: "5px 10px",
-          marginLeft: 10,
-        }}
-      >
-        Colocar Cuadrado
-      </button>
-
-      <button
-        onClick={() => {
-          setAreaMode("cone");
-          setPaintMode(false);
-          setMoveMode(false);
-          setMeasureMode(false);
-        }}
-        style={{
-          backgroundColor: areaMode === "cone" ? "lightblue" : "lightgray",
-          padding: "5px 10px",
-          marginLeft: 10,
-        }}
-      >
-        Colocar Cono
-      </button>
-
-      <Stage
-        width={gridWidth}
-        height={gridHeight}
-        onMouseDown={handleMouseDown}
-        onMouseMove={(e) => {
-          handleMouseMove(e);         // Para pintar (si paintMode está activo)
-          handleMouseMovePlayer(e);   // Para mover el jugador (si moveMode está activo)
-        }}
-        onMouseUp={() => {
-          handleMouseUp();
-          setIsDraggingPlayer(false);
-          setDragOffsets({});
-        }}
-        style={{ background: "#ffffff" }}
-        tabIndex={0}
-      >
-
-        <Layer>
-          {backgroundImage && (
-            <Image
-              image={backgroundImage}
-              x={(gridWidth - backgroundImage.width) / 2}
-              y={(gridHeight - backgroundImage.height) / 2}
-              width={backgroundImage.width}
-              height={backgroundImage.height}
-            />
-          )}
-
-          {drawGrid()}
-
-          {/* Area de Selección */}
-          {selectionRect && (
-            <Rect
-              x={selectionRect.x}
-              y={selectionRect.y}
-              width={selectionRect.width}
-              height={selectionRect.height}
-              stroke="blue"
-              dash={[4, 4]}
-              fill="rgba(0, 0, 255, 0.1)"
-            />
-          )}
-
-          {/* Casillas pintadas con color */}
-          {[...paintedTiles.entries()].map(([key, color]) => {
-            const [x, y] = key.split(",").map(Number);
-            return (
-              <Rect
-                key={key}
-                x={x * tileSize}
-                y={y * tileSize}
-                width={tileSize}
-                height={tileSize}
-                fill={color}
-                opacity={0.8}
-              />
-            );
-          })}
-
-          {/* Pintar Lineas */}
-          {[...paintedEdges.entries()].map(([key, color]) => {
-            const [cell, edge] = key.split("-");
-            const [x, y] = cell.split(",").map(Number);
-
-            let points: number[] = [];
-            const startX = x * tileSize;
-            const startY = y * tileSize;
-
-            switch (edge) {
-              case "top":
-                points = [startX, startY, startX + tileSize, startY];
-                break;
-              case "bottom":
-                points = [startX, startY + tileSize, startX + tileSize, startY + tileSize];
-                break;
-              case "left":
-                points = [startX, startY, startX, startY + tileSize];
-                break;
-              case "right":
-                points = [startX + tileSize, startY, startX + tileSize, startY + tileSize];
-                break;
-            }
-
-            return (
-              <Line
-                key={key}
-                points={points}
-                stroke={color}
-                strokeWidth={4}
-              />
-            );
-          })}
-
-          {/* Regla */}
-          {measureMode && measureStart && measureEnd && (
-            <>
-              <Line
-                points={[
-                  measureStart.x * tileSize + tileSize / 2,
-                  measureStart.y * tileSize + tileSize / 2,
-                  measureEnd.x * tileSize + tileSize / 2,
-                  measureEnd.y * tileSize + tileSize / 2,
-                ]}
-                stroke="black"
-                strokeWidth={2}
-                dash={[10, 5]}
-              />
-              <Text
-                x={((measureStart.x + measureEnd.x) / 2) * tileSize}
-                y={((measureStart.y + measureEnd.y) / 2) * tileSize}
-                text={`${Math.round(
-                  Math.sqrt(
-                    Math.pow(measureEnd.x - measureStart.x, 2) +
-                    Math.pow(measureEnd.y - measureStart.y, 2)
-                  ) * 5
-                )} pies`}
-                fontSize={14}
-                fill="black"
-              />
-              {/* Circunferencia de radio igual a la distancia */}
-              <Circle
-                x={measureStart.x * tileSize + tileSize / 2}
-                y={measureStart.y * tileSize + tileSize / 2}
-                radius={
-                  Math.sqrt(
-                    Math.pow(measureEnd.x - measureStart.x, 2) +
-                    Math.pow(measureEnd.y - measureStart.y, 2)
-                  ) * tileSize
-                }
-                stroke="black"
-                strokeWidth={1}
-                dash={[5, 5]}
-                opacity={0.5}
-              />
-            </>
-          )}
-
-          {/* Rect cursor */}
-
-          {/* Círculo de player */}
-          {tokens.map((token) => (
-            <React.Fragment key={token.id}>
-              <Text
-                x={token.x - token.radius}
-                y={token.y - token.radius - 18}
-                width={token.radius * 2}
-                align="center"
-                text={token.vida}
-                fontSize={12}
-                fill="black"
-              />
-
-              {token.image ? (
-                <CircularToken
-                  image={token.image}
-                  x={token.x}
-                  y={token.y}
-                  radius={token.radius}
-                  onMouseDown={() => {
-                    if (moveMode) {
-                      setSelectedTokenId(token.id);
-                      setIsDraggingPlayer(true);
-                    }
-                  }}
-                  onContextMenu={(e) => {
-                    e.evt.preventDefault();
-                    setContextTokenId(token.id);
-                    setContextMenuPosition({ x: e.evt.clientX, y: e.evt.clientY });
-                    setContextMenuVisible(true);
-                  }}
-
-                />
-              ) : (
-                <Circle
-                  x={token.x}
-                  y={token.y}
-                  radius={token.radius}
-                  fill={token.color}
-                  stroke={
-                    token.id === selectedTokenId || multiSelectedIds.includes(token.id)
-                      ? "black"
-                      : undefined
-                  }
-                  strokeWidth={
-                    token.id === selectedTokenId || multiSelectedIds.includes(token.id)
-                      ? 2
-                      : 0
-                  }
-                  onMouseDown={(e) => {
-                    if (moveMode) {
-                      const stage = e.target.getStage();
-                      const pos = stage?.getPointerPosition();
-                      const offsets: { [id: string]: { dx: number; dy: number } } = {};
-                      if (!pos) return;
-
-                      setSelectedTokenId(token.id);
-                      if (multiSelectedIds.length > 1 || (multiSelectedIds.length === 1 && multiSelectedIds[0] !== token.id)) {
-                        setMultiSelectedIds([token.id]);
-                      }
-                      setIsDraggingPlayer(true);
-                      setDragOffsets(offsets);
-
-
-
-                      // Obtener tokens a mover (el seleccionado o todos los múltiples)
-                      const movingIds = multiSelectedIds.length > 0
-                        ? multiSelectedIds.includes(token.id)
-                          ? multiSelectedIds
-                          : [token.id]
-                        : [token.id];
-
-                      for (const t of tokens) {
-                        if (movingIds.includes(t.id)) {
-                          offsets[t.id] = {
-                            dx: t.x - pos.x,
-                            dy: t.y - pos.y,
-                          };
-                        }
-                      }
-
-                      setDragOffsets(offsets);
-                    }
-                  }}
-                  onContextMenu={(e) => {
-                    e.evt.preventDefault();
-                    setContextTokenId(token.id);
-                    setContextMenuPosition({ x: e.evt.clientX, y: e.evt.clientY });
-                    setContextMenuVisible(true);
-                  }}
-                />
-              )}
-
-              <Text
-                x={token.x - token.radius}
-                y={token.y + token.radius + 2}
-                width={token.radius * 2}
-                align="center"
-                text={token.nombre}
-                fontSize={12}
-                fill="black"
-              />
-            </React.Fragment>
-          ))}
-
-          {areaShapes.map((shape) => {
-            const commonProps = {
-              x: shape.x,
-              y: shape.y,
-              fill: "rgba(255, 0, 0, 0.3)",
-              stroke: "red",
-              strokeWidth: 2,
-              draggable: true,
-              ref: (node: any) => {
-                if (node) shapeRefs.current.set(shape.id, node);
-              },
-              onClick: () => setSelectedAreaId(shape.id),
-              onTap: () => setSelectedAreaId(shape.id),
-              onDragEnd: (e: any) => {
-                const { x, y } = e.target.position();
-                setAreaShapes(prev =>
-                  prev.map(s =>
-                    s.id === shape.id ? { ...s, x, y } : s
-                  )
-                );
-              },
-              onTransformEnd: (e: any) => {
-                const node = e.target;
-                const scale = node.scaleX();
-                node.scaleX(1);
-                node.scaleY(1);
-                const rotation = node.rotation();
-
-                setAreaShapes(prev =>
-                  prev.map(s =>
-                    s.id === shape.id
-                      ? {
-                        ...s,
-                        size: s.size * scale,
-                        rotation,
-                      }
-                      : s
-                  )
-                );
-              },
-              onContextMenu: (e: any) => {
-                e.evt.preventDefault();
-                setAreaShapes(prev => prev.filter(s => s.id !== shape.id));
-                if (selectedAreaId === shape.id) setSelectedAreaId(null);
-              },
-            };
-
-            if (shape.type === "circle") {
-              return <Circle key={shape.id} {...commonProps} radius={shape.size / 2} />;
-            }
-
-            if (shape.type === "square") {
-              return (
-                <Rect
-                  key={shape.id}
-                  {...commonProps}
-                  width={shape.size}
-                  height={shape.size}
-                  offsetX={shape.size / 2}
-                  offsetY={shape.size / 2}
-                />
-              );
-            }
-
-            if (shape.type === "cone") {
-              const points = [
-                0, 0,
-                shape.size, -shape.size / 2,
-                shape.size, shape.size / 2,
-              ];
-              return (
-                <Line
-                  key={shape.id}
-                  {...commonProps}
-                  points={points}
-                  closed
-                  offsetX={0}
-                  offsetY={0}
-                  rotation={shape.rotation || 0}
-                />
-              );
-            }
-
-            return null;
-          })}
-
-          <Transformer
-            ref={transformerRef}
-            rotateEnabled={true}
-            enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
-            boundBoxFunc={(newBox) => {
-              const size = Math.max(newBox.width, newBox.height);
-              return {
-                x: newBox.x,
-                y: newBox.y,
-                width: size,
-                height: size,
-                rotation: newBox.rotation, // necesario si rotás
-              };
-            }}
+    <div className="flex flex-col h-screen bg-content1">
+      {/* Top Bar */}
+      <div className="flex flex-wrap items-center p-3 bg-content2 border-b border-default-200 gap-3 shadow-sm">
+        {/* Color Picker */}
+        <div className="flex items-center">
+          <ColorPalette
+            colors={paletteColors}
+            selectedColor={selectedColor}
+            onColorChange={setSelectedColor}
+            setColors={setPaletteColors}
           />
+        </div>
 
-          {laserMode && laserPath.length > 1 && (
-            <Line
-              points={laserPath.flatMap((p) => [p.x, p.y])}
-              stroke="red"
-              strokeWidth={4}
-              lineCap="round"
-              lineJoin="round"
-              tension={0.4} // suaviza la curva
-              opacity={0.5}
-              shadowColor="red"
-              shadowBlur={20}
-              shadowOpacity={0.6}
-            />
-          )}
+        <Divider orientation="vertical" className="h-8 mx-2" />
 
-        </Layer>
-      </Stage>
+        {/* Audio Panel */}
+        <div className="flex items-center">
+          <AudioPanel />
+        </div>
 
-      {contextMenuVisible && contextTokenId && (
-        <div
-          style={{
-            position: "fixed",
-            top: contextMenuPosition.y,
-            left: contextMenuPosition.x,
-            backgroundColor: "white",
-            border: "1px solid #ccc",
-            boxShadow: "0 2px 5px rgba(0,0,0,0.2)",
-            zIndex: 1000,
-            padding: 8,
-          }}
-          onContextMenu={(e) => e.preventDefault()}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <label style={{ fontSize: 14 }}>Color:</label>
-          <input
-            type="color"
-            value={
-              contextTokenId
-                ? rgbToHex(tokens.find((t) => t.id === contextTokenId)?.color || "rgb(0, 0, 0)")
-                : "#000000"
-            }
-            onChange={(e) => {
-              const newColor = hexToRgb(e.target.value);
-              setTokens((tokens) =>
-                tokens.map((t) =>
-                  t.id === contextTokenId ? { ...t, color: newColor } : t
-                )
-              );
-            }}
-            style={{ display: "block", marginBottom: 8 }}
-          />
+        <Divider orientation="vertical" className="h-8 mx-2" />
 
-          <label>Nombre:</label>
-          <input
-            type="text"
-            value={tokens.find((t) => t.id === contextTokenId)?.nombre || ""}
-            onChange={(e) => {
-              const value = e.target.value;
-              setTokens((tokens) =>
-                tokens.map((t) =>
-                  t.id === contextTokenId ? { ...t, nombre: value } : t
-                )
-              );
-            }}
-            style={{ display: "block", marginBottom: 8, width: "100%" }}
-          />
-
-          <label>Vida:</label>
-          <input
-            type="text"
-            value={tokens.find((t) => t.id === contextTokenId)?.vida || ""}
-            onChange={(e) => {
-              const value = e.target.value;
-              setTokens((tokens) =>
-                tokens.map((t) =>
-                  t.id === contextTokenId ? { ...t, vida: value } : t
-                )
-              );
-            }}
-            style={{ display: "block", width: "100%" }}
-          />
-
-          <label>Imagen:</label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (!file || !contextTokenId) return;
-
+        {/* Hidden Image Upload */}
+        <input
+          type="file"
+          accept="image/*"
+          id="bg-upload"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
               const img = new window.Image();
               img.src = URL.createObjectURL(file);
               img.onload = () => {
-                setTokens((tokens) =>
-                  tokens.map((t) =>
-                    t.id === contextTokenId ? { ...t, image: img } : t
-                  )
-                );
-              };
-            }}
-            style={{ display: "block", marginBottom: 8 }}
-          />
+                const canvas = document.createElement("canvas");
+                canvas.width = img.height;
+                canvas.height = img.width;
+                const ctx = canvas.getContext("2d");
 
-          <hr style={{ margin: "8px 0" }} />
-          <button
-            onClick={() => {
-              setTokens(tokens => tokens.filter(t => t.id !== contextTokenId));
-              setContextTokenId(null);
-              setContextMenuVisible(false);
-            }}
-            style={{
-              backgroundColor: "crimson",
-              color: "white",
-              border: "none",
-              padding: "6px 12px",
-              cursor: "pointer",
-              width: "100%",
-              fontWeight: "bold",
-            }}
+                if (ctx) {
+                  ctx.translate(canvas.width / 2, canvas.height / 2);
+                  ctx.rotate(-Math.PI / 2);
+                  ctx.drawImage(img, -img.width / 2, -img.height / 2);
+                }
+
+                const rotatedImg = new window.Image();
+                rotatedImg.src = canvas.toDataURL();
+                rotatedImg.onload = () => {
+                  setBackgroundImage(rotatedImg);
+                };
+              };
+            }
+          }}
+        />
+
+        {/* Background Button */}
+        <Tooltip content="Upload background image">
+          <Button
+            color="default"
+            variant="flat"
+            startContent={<Icon icon="lucide:image" />}
+            onClick={() => document.getElementById("bg-upload")?.click()}
           >
-            🗑 Eliminar Token
-          </button>
+            Background
+          </Button>
+        </Tooltip>
+
+        {/* Spacer + Add Token */}
+        <div className="ml-auto">
+          <Button
+            color="success"
+            startContent={<Icon icon="lucide:plus-circle" />}
+            onClick={addNewToken}
+            className="font-medium"
+          >
+            Add Token
+          </Button>
+        </div>
+      </div>
+
+      {/* Tool Buttons Row - Moved from sides to top */}
+      <div className="flex justify-between items-center p-2 bg-content1 border-b border-default-200">
+        {/* Left Tool Buttons - Now at top */}
+        <div className="flex">
+          <ButtonGroup className="shadow-sm rounded-lg overflow-hidden">
+            <Tooltip content="Paint tiles" placement="bottom">
+              <Button
+                color={paintMode ? "primary" : "default"}
+                onClick={togglePaintMode}
+                startContent={<Icon icon="lucide:paintbrush" width={20} />}
+                className="px-3 py-2"
+                size="sm"
+              >
+                Paint
+              </Button>
+            </Tooltip>
+            <Tooltip content="Paint edges" placement="bottom">
+              <Button
+                color={paintEdgesMode ? "primary" : "default"}
+                onClick={() => {
+                  setPaintEdgesMode((prev) => {
+                    if (!prev) {
+                      setPaintMode(false);
+                      setMoveMode(false);
+                      setMeasureMode(false);
+                      setAreaMode(false);
+                    }
+                    return !prev;
+                  });
+                }}
+                startContent={<Icon icon="lucide:square" width={20} />}
+                className="px-3 py-2"
+                size="sm"
+              >
+                Edges
+              </Button>
+            </Tooltip>
+            <Tooltip content="Move tokens" placement="bottom">
+              <Button
+                color={moveMode ? "primary" : "default"}
+                onClick={toggleMoveMode}
+                startContent={<Icon icon="lucide:move" width={20} />}
+                className="px-3 py-2"
+                size="sm"
+              >
+                Move
+              </Button>
+            </Tooltip>
+            <Tooltip content="Measure distance" placement="bottom">
+              <Button
+                color={measureMode ? "primary" : "default"}
+                onClick={() => {
+                  setMeasureMode((prev) => !prev);
+                  setMeasureStart(null);
+                  setMeasureEnd(null);
+                  setPaintMode(false);
+                  setMoveMode(false);
+                }}
+                startContent={<Icon icon="lucide:ruler" width={20} />}
+                className="px-3 py-2"
+                size="sm"
+              >
+                Measure
+              </Button>
+            </Tooltip>
+            <Tooltip content="Laser pointer" placement="bottom">
+              <Button
+                color={laserMode ? "primary" : "default"}
+                onClick={() => {
+                  setLaserMode((prev) => !prev);
+                  setPaintMode(false);
+                  setMoveMode(false);
+                  setMeasureMode(false);
+                  setPaintEdgesMode(false);
+                }}
+                startContent={<Icon icon="lucide:zap" width={20} />}
+                className="px-3 py-2"
+                size="sm"
+              >
+                Laser
+              </Button>
+            </Tooltip>
+          </ButtonGroup>
         </div>
 
-      )}
-      <DiceRoller></DiceRoller>
-    </>
+        {/* Right Tool Buttons - Now at top */}
+        <div className="flex">
+          <ButtonGroup className="shadow-sm rounded-lg overflow-hidden">
+            <Tooltip content="Add circle area" placement="bottom">
+              <Button
+                color={areaMode === "circle" ? "primary" : "default"}
+                onClick={() => {
+                  setAreaMode("circle");
+                  setPaintMode(false);
+                  setMoveMode(false);
+                  setMeasureMode(false);
+                }}
+                startContent={<Icon icon="lucide:circle" width={20} />}
+                className="px-3 py-2"
+                size="sm"
+              >
+                Circle
+              </Button>
+            </Tooltip>
+            <Tooltip content="Add square area" placement="bottom">
+              <Button
+                color={areaMode === "square" ? "primary" : "default"}
+                onClick={() => {
+                  setAreaMode("square");
+                  setPaintMode(false);
+                  setMoveMode(false);
+                  setMeasureMode(false);
+                }}
+                startContent={<Icon icon="lucide:square" width={20} />}
+                className="px-3 py-2"
+                size="sm"
+              >
+                Square
+              </Button>
+            </Tooltip>
+            <Tooltip content="Add cone area" placement="bottom">
+              <Button
+                color={areaMode === "cone" ? "primary" : "default"}
+                onClick={() => {
+                  setAreaMode("cone");
+                  setPaintMode(false);
+                  setMoveMode(false);
+                  setMeasureMode(false);
+                }}
+                startContent={<Icon icon="lucide:triangle" width={20} />}
+                className="px-3 py-2"
+                size="sm"
+              >
+                Cone
+              </Button>
+            </Tooltip>
+          </ButtonGroup>
+        </div>
+      </div>
+
+      {/* Main Canvas Area */}
+      <div className="flex-1 relative overflow-auto">
+        {/* Canvas Container */}
+        <div className="w-full h-full overflow-auto bg-gray-100">
+          {/* Stage */}
+          <Stage 
+            width={gridWidth}
+            height={gridHeight}
+            onMouseDown={handleMouseDown}
+            onMouseMove={(e) => {
+              handleMouseMove(e);
+              handleMouseMovePlayer(e);
+            }}
+            onMouseUp={() => {
+              handleMouseUp();
+              setIsDraggingPlayer(false);
+              setDragOffsets({});
+            }}
+            style={{
+              backgroundImage: backgroundImage ? `url(${backgroundImage.src})` : "none",
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}
+            tabIndex={0}
+          >
+            <Layer>
+              {backgroundImage && (
+                <Image
+                  image={backgroundImage}
+                  x={(gridWidth - backgroundImage.width) / 2}
+                  y={(gridHeight - backgroundImage.height) / 2}
+                  width={backgroundImage.width}
+                  height={backgroundImage.height}
+                />
+              )}
+
+              {drawGrid()}
+
+              {/* Area de Selección */}
+              {selectionRect && (
+                <Rect
+                  x={selectionRect.x}
+                  y={selectionRect.y}
+                  width={selectionRect.width}
+                  height={selectionRect.height}
+                  stroke="blue"
+                  dash={[4, 4]}
+                  fill="rgba(0, 0, 255, 0.1)"
+                />
+              )}
+
+              {/* Casillas pintadas con color */}
+              {[...paintedTiles.entries()].map(([key, color]) => {
+                const [x, y] = key.split(",").map(Number);
+                return (
+                  <Rect
+                    key={key}
+                    x={x * tileSize}
+                    y={y * tileSize}
+                    width={tileSize}
+                    height={tileSize}
+                    fill={color}
+                    opacity={0.8}
+                  />
+                );
+              })}
+
+              {/* Pintar Lineas */}
+              {[...paintedEdges.entries()].map(([key, color]) => {
+                const [cell, edge] = key.split("-");
+                const [x, y] = cell.split(",").map(Number);
+
+                let points: number[] = [];
+                const startX = x * tileSize;
+                const startY = y * tileSize;
+
+                switch (edge) {
+                  case "top":
+                    points = [startX, startY, startX + tileSize, startY];
+                    break;
+                  case "bottom":
+                    points = [startX, startY + tileSize, startX + tileSize, startY + tileSize];
+                    break;
+                  case "left":
+                    points = [startX, startY, startX, startY + tileSize];
+                    break;
+                  case "right":
+                    points = [startX + tileSize, startY, startX + tileSize, startY + tileSize];
+                    break;
+                }
+
+                return (
+                  <Line
+                    key={key}
+                    points={points}
+                    stroke={color}
+                    strokeWidth={4}
+                  />
+                );
+              })}
+
+              {/* Regla */}
+              {measureMode && measureStart && measureEnd && (
+                <>
+                  <Line
+                    points={[
+                      measureStart.x * tileSize + tileSize / 2,
+                      measureStart.y * tileSize + tileSize / 2,
+                      measureEnd.x * tileSize + tileSize / 2,
+                      measureEnd.y * tileSize + tileSize / 2,
+                    ]}
+                    stroke="black"
+                    strokeWidth={2}
+                    dash={[10, 5]}
+                  />
+                  <Text
+                    x={((measureStart.x + measureEnd.x) / 2) * tileSize}
+                    y={((measureStart.y + measureEnd.y) / 2) * tileSize}
+                    text={`${Math.round(
+                      Math.sqrt(
+                        Math.pow(measureEnd.x - measureStart.x, 2) +
+                        Math.pow(measureEnd.y - measureStart.y, 2)
+                      ) * 5
+                    )} pies`}
+                    fontSize={14}
+                    fill="black"
+                    fontStyle="bold"
+                  />
+                  {/* Circunferencia de radio igual a la distancia */}
+                  <Circle
+                    x={measureStart.x * tileSize + tileSize / 2}
+                    y={measureStart.y * tileSize + tileSize / 2}
+                    radius={
+                      Math.sqrt(
+                        Math.pow(measureEnd.x - measureStart.x, 2) +
+                        Math.pow(measureEnd.y - measureStart.y, 2)
+                      ) * tileSize
+                    }
+                    stroke="black"
+                    strokeWidth={1}
+                    dash={[5, 5]}
+                    opacity={0.5}
+                  />
+                </>
+              )}
+
+              {/* Círculo de player */}
+              {tokens.map((token) => (
+                <React.Fragment key={token.id}>
+                  <Text
+                    x={token.x - token.radius}
+                    y={token.y - token.radius - 18}
+                    width={token.radius * 2}
+                    align="center"
+                    text={token.vida}
+                    fontSize={12}
+                    fill="black"
+                    fontStyle="bold"
+                  />
+
+                  {token.image ? (
+                    <CircularToken
+                      image={token.image}
+                      x={token.x}
+                      y={token.y}
+                      radius={token.radius}
+                      onMouseDown={() => {
+                        if (moveMode) {
+                          setSelectedTokenId(token.id);
+                          setIsDraggingPlayer(true);
+                        }
+                      }}
+                      onContextMenu={(e) => {
+                        e.evt.preventDefault();
+                        setContextTokenId(token.id);
+                        setContextMenuPosition({ x: e.evt.clientX, y: e.evt.clientY });
+                        setContextMenuVisible(true);
+                      }}
+                    />
+                  ) : (
+                    <Circle
+                      x={token.x}
+                      y={token.y}
+                      radius={token.radius}
+                      fill={token.color}
+                      stroke={
+                        token.id === selectedTokenId || multiSelectedIds.includes(token.id)
+                          ? "black"
+                          : undefined
+                      }
+                      strokeWidth={
+                        token.id === selectedTokenId || multiSelectedIds.includes(token.id)
+                          ? 2
+                          : 0
+                      }
+                      onMouseDown={(e) => {
+                        if (moveMode) {
+                          const stage = e.target.getStage();
+                          const pos = stage?.getPointerPosition();
+                          const offsets: { [id: string]: { dx: number; dy: number } } = {};
+                          if (!pos) return;
+
+                          setSelectedTokenId(token.id);
+                          if (multiSelectedIds.length > 1 || (multiSelectedIds.length === 1 && multiSelectedIds[0] !== token.id)) {
+                            setMultiSelectedIds([token.id]);
+                          }
+                          setIsDraggingPlayer(true);
+                          setDragOffsets(offsets);
+
+                          // Obtener tokens a mover (el seleccionado o todos los múltiples)
+                          const movingIds = multiSelectedIds.length > 0
+                            ? multiSelectedIds.includes(token.id)
+                              ? multiSelectedIds
+                              : [token.id]
+                            : [token.id];
+
+                          for (const t of tokens) {
+                            if (movingIds.includes(t.id)) {
+                              offsets[t.id] = {
+                                dx: t.x - pos.x,
+                                dy: t.y - pos.y,
+                              };
+                            }
+                          }
+
+                          setDragOffsets(offsets);
+                        }
+                      }}
+                      onContextMenu={(e) => {
+                        e.evt.preventDefault();
+                        setContextTokenId(token.id);
+                        setContextMenuPosition({ x: e.evt.clientX, y: e.evt.clientY });
+                        setContextMenuVisible(true);
+                      }}
+                    />
+                  )}
+
+                  <Text
+                    x={token.x - token.radius}
+                    y={token.y + token.radius + 2}
+                    width={token.radius * 2}
+                    align="center"
+                    text={token.nombre}
+                    fontSize={12}
+                    fill="black"
+                    fontStyle="bold"
+                  />
+                </React.Fragment>
+              ))}
+
+              {areaShapes.map((shape) => {
+                const commonProps = {
+                  x: shape.x,
+                  y: shape.y,
+                  fill: "rgba(255, 0, 0, 0.3)",
+                  stroke: "red",
+                  strokeWidth: 2,
+                  draggable: true,
+                  ref: (node: any) => {
+                    if (node) shapeRefs.current.set(shape.id, node);
+                  },
+                  onClick: () => setSelectedAreaId(shape.id),
+                  onTap: () => setSelectedAreaId(shape.id),
+                  onDragEnd: (e: any) => {
+                    const { x, y } = e.target.position();
+                    setAreaShapes(prev =>
+                      prev.map(s =>
+                        s.id === shape.id ? { ...s, x, y } : s
+                      )
+                    );
+                  },
+                  onTransformEnd: (e: any) => {
+                    const node = e.target;
+                    const scale = node.scaleX();
+                    node.scaleX(1);
+                    node.scaleY(1);
+                    const rotation = node.rotation();
+
+                    setAreaShapes(prev =>
+                      prev.map(s =>
+                        s.id === shape.id
+                          ? {
+                            ...s,
+                            size: s.size * scale,
+                            rotation,
+                          }
+                          : s
+                      )
+                    );
+                  },
+                  onContextMenu: (e: any) => {
+                    e.evt.preventDefault();
+                    setAreaShapes(prev => prev.filter(s => s.id !== shape.id));
+                    if (selectedAreaId === shape.id) setSelectedAreaId(null);
+                  },
+                };
+
+                if (shape.type === "circle") {
+                  return <Circle key={shape.id} {...commonProps} radius={shape.size / 2} />;
+                }
+
+                if (shape.type === "square") {
+                  return (
+                    <Rect
+                      key={shape.id}
+                      {...commonProps}
+                      width={shape.size}
+                      height={shape.size}
+                      offsetX={shape.size / 2}
+                      offsetY={shape.size / 2}
+                    />
+                  );
+                }
+
+                if (shape.type === "cone") {
+                  const points = [
+                    0, 0,
+                    shape.size, -shape.size / 2,
+                    shape.size, shape.size / 2,
+                  ];
+                  return (
+                    <Line
+                      key={shape.id}
+                      {...commonProps}
+                      points={points}
+                      closed
+                      offsetX={0}
+                      offsetY={0}
+                      rotation={shape.rotation || 0}
+                    />
+                  );
+                }
+
+                return null;
+              })}
+
+              <Transformer
+                ref={transformerRef}
+                rotateEnabled={true}
+                enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
+                boundBoxFunc={(newBox) => {
+                  const size = Math.max(newBox.width, newBox.height);
+                  return {
+                    x: newBox.x,
+                    y: newBox.y,
+                    width: size,
+                    height: size,
+                    rotation: newBox.rotation,
+                  };
+                }}
+              />
+
+              {laserMode && laserPath.length > 1 && (
+                <Line
+                  points={laserPath.flatMap((p) => [p.x, p.y])}
+                  stroke="red"
+                  strokeWidth={4}
+                  lineCap="round"
+                  lineJoin="round"
+                  tension={0.4}
+                  opacity={0.5}
+                  shadowColor="red"
+                  shadowBlur={20}
+                  shadowOpacity={0.6}
+                />
+              )}
+            </Layer>
+          </Stage>
+
+          {/* Token Context Menu */}
+          {contextMenuVisible && contextTokenId && (
+            <div
+              id="token-context-menu"
+              className="fixed bg-content1 border border-default-200 shadow-md rounded-lg p-4 z-50 w-64"
+              style={{
+                top: contextMenuPosition.y,
+                left: contextMenuPosition.x,
+              }}
+              onContextMenu={(e) => e.preventDefault()}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Color:</label>
+                  <input
+                    type="color"
+                    className="w-full h-8 rounded cursor-pointer"
+                    value={
+                      contextTokenId
+                        ? rgbToHex(tokens.find((t) => t.id === contextTokenId)?.color || "rgb(0, 0, 0)")
+                        : "#000000"
+                    }
+                    onChange={(e) => {
+                      const newColor = hexToRgb(e.target.value);
+                      setTokens((tokens) =>
+                        tokens.map((t) =>
+                          t.id === contextTokenId ? { ...t, color: newColor } : t
+                        )
+                      );
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Nombre:</label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border border-default-300 rounded"
+                    value={tokens.find((t) => t.id === contextTokenId)?.nombre || ""}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setTokens((tokens) =>
+                        tokens.map((t) =>
+                          t.id === contextTokenId ? { ...t, nombre: value } : t
+                        )
+                      );
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Vida:</label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border border-default-300 rounded"
+                    value={tokens.find((t) => t.id === contextTokenId)?.vida || ""}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setTokens((tokens) =>
+                        tokens.map((t) =>
+                          t.id === contextTokenId ? { ...t, vida: value } : t
+                        )
+                      );
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Imagen:</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-primary file:text-white hover:file:bg-primary-600"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file || !contextTokenId) return;
+
+                      const img = new window.Image();
+                      img.src = URL.createObjectURL(file);
+                      img.onload = () => {
+                        setTokens((tokens) =>
+                          tokens.map((t) =>
+                            t.id === contextTokenId ? { ...t, image: img } : t
+                          )
+                        );
+                      };
+                    }}
+                  />
+                </div>
+
+                <Divider className="my-3" />
+                
+                <Button
+                  color="danger"
+                  variant="solid"
+                  className="w-full"
+                  startContent={<Icon icon="lucide:trash-2" />}
+                  onClick={() => {
+                    setTokens(tokens => tokens.filter(t => t.id !== contextTokenId));
+                    setContextTokenId(null);
+                    setContextMenuVisible(false);
+                  }}
+                >
+                  Eliminar Token
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Dice Roller */}
+      <div className="absolute bottom-4 right-4 z-10">
+        <Popover placement="top">
+          <PopoverTrigger>
+            <Button 
+              color="primary" 
+              startContent={<Icon icon="lucide:dice" width={20} />}
+              className="px-6 shadow-md"
+              size="lg"
+            >
+              Roll Dice
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="p-0 w-[300px]">
+            <DiceRoller onRollComplete={(value, diceType, modifier, total) => {
+              console.log(`Roll result: ${value} ${diceType} ${modifier > 0 ? '+' : ''}${modifier} = ${total}`);
+            }} />
+          </PopoverContent>
+        </Popover>
+      </div>
+
+      {/* Keyboard Shortcuts Info */}
+      <div className="absolute bottom-4 left-4 z-10">
+        <Popover placement="top">
+          <PopoverTrigger>
+            <Button 
+              variant="flat" 
+              color="default"
+              startContent={<Icon icon="lucide:keyboard" width={18} />}
+              size="sm"
+            >
+              Shortcuts
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent>
+            <div className="p-2 space-y-2">
+              <h3 className="text-medium font-semibold">Keyboard Shortcuts</h3>
+              <div className="text-small space-y-1">
+                <p><span className="font-medium">Shift + Click/Drag:</span> Select multiple tokens</p>
+                <p><span className="font-medium">R:</span> Increase token size</p>
+                <p><span className="font-medium">F:</span> Decrease token size</p>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+    </div>
   );
 }
