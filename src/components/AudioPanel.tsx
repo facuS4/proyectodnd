@@ -3,8 +3,8 @@ import AudioManager from "./AudioManager";
 
 export default function AudioPanel() {
   const availableTracks = [
-    { name: "Rain", src: "public/music/rain.mp3" },
-    { name: "Wind", src: "public/music/wind.mp3" },
+    { name: "Rain", src: "/music/rain.mp3" },
+    { name: "Wind", src: "/music/wind.mp3" },
   ];
 
   const [activeTracks, setActiveTracks] = useState<

@@ -1,5 +1,5 @@
 import React from "react";
-import { Card, CardBody, CardHeader, Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Input } from "@heroui/react";
+import { Card, CardBody, CardHeader, Button, Input } from "@heroui/react";
 import { Icon } from "@iconify/react";
 
 interface DiceRollerProps {
@@ -8,7 +8,7 @@ interface DiceRollerProps {
 
 export const DiceRoller: React.FC<DiceRollerProps> = ({ onRollComplete }) => {
   const [rollResult, setRollResult] = React.useState<{[key: string]: number[]} | null>(null);
-  const [rolling, setRolling] = React.useState(false);
+  const [rolling] = React.useState(false);
   const [rotateX, setRotateX] = React.useState(0);
   const [rotateY, setRotateY] = React.useState(0);
   const [rotateZ, setRotateZ] = React.useState(0);
@@ -23,7 +23,7 @@ export const DiceRoller: React.FC<DiceRollerProps> = ({ onRollComplete }) => {
   });
   const [modifier, setModifier] = React.useState("0");
   const [isAnimating, setIsAnimating] = React.useState(false);
-  const [animationPhase, setAnimationPhase] = React.useState<'initial' | 'rolling' | 'complete'>('initial');
+  const [_animationPhase, setAnimationPhase] = React.useState<'initial' | 'rolling' | 'complete'>('initial');
   const [animatingDice, setAnimatingDice] = React.useState<string[]>([]);
   
   const diceOptions = [
@@ -135,7 +135,7 @@ export const DiceRoller: React.FC<DiceRollerProps> = ({ onRollComplete }) => {
         // Get total for all dice
         let totalValue = 0;
         
-        Object.entries(result).forEach(([diceType, values]) => {
+        Object.entries(result).forEach(([_diceType, values]) => {
           if (values && values.length > 0) {
             values.forEach(val => {
               totalValue += val;
@@ -468,7 +468,7 @@ export const DiceRoller: React.FC<DiceRollerProps> = ({ onRollComplete }) => {
     if (!rollResult) return null;
     
     let sum = 0;
-    Object.entries(rollResult).forEach(([diceType, results]) => {
+    Object.entries(rollResult).forEach(([_diceType, results]) => {
       sum += results.reduce((acc, val) => acc + val, 0);
     });
     

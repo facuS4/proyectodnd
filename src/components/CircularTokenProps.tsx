@@ -30,7 +30,7 @@ export default function CircularToken({ image, x, y, radius, onMouseDown, onCont
         image={image}
         onMouseDown={onMouseDown}
         onContextMenu={onContextMenu}
-        sceneFunc={(ctx, shape) => {
+        sceneFunc={(ctx, _shape) => {
           ctx.beginPath();
           ctx.arc(radius, radius, radius, 0, Math.PI * 2, false);
           ctx.closePath();
