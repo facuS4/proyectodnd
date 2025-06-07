@@ -379,8 +379,9 @@ export default function GridAdaptativo() {
       } else {
         transformer.nodes([]);
       }
+
       transformer.getLayer()?.batchDraw();
-    }, 0); // Espera un ciclo de render
+    }, 0);
   }, [selectedAreaId, areaShapes]);
 
   useEffect(() => {
@@ -1499,16 +1500,6 @@ export default function GridAdaptativo() {
                 ref={transformerRef}
                 rotateEnabled={true}
                 enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
-                boundBoxFunc={(newBox) => {
-                  const size = Math.max(newBox.width, newBox.height);
-                  return {
-                    x: newBox.x,
-                    y: newBox.y,
-                    width: size,
-                    height: size,
-                    rotation: newBox.rotation,
-                  };
-                }}
               />
 
               {laserMode && laserPath.length > 1 && (
