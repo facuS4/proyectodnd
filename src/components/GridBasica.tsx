@@ -229,6 +229,7 @@ export default function GridAdaptativo() {
   const [paintedEdges, setPaintedEdges] = useState<Map<string, string>>(new Map());
   const [paintEdgesMode, setPaintEdgesMode] = useState(false);
   const [isDrawingEdge, setIsDrawingEdge] = useState(false);
+  const [rectEdgePaintStart, setRectEdgePaintStart] = useState<{ x: number; y: number } | null>(null);
 
   // Cambiamos a Map<string, string> para almacenar color por casilla
   const [paintedTiles, setPaintedTiles] = useState<Map<string, string>>(new Map());
@@ -270,6 +271,60 @@ export default function GridAdaptativo() {
       if (!prev) setMoveMode(false); // Al activar pintar, desactiva mover
       return !prev;
     });
+  };
+
+  const paintEdge = (x: number, y: number, edge: string) => {
+    const key = `${x},${y}-${edge}`;
+    const updates: [string, string][] = [[key, edge]];
+
+    // Borde espejo
+    let mirrorKey = null;
+    let mirrorX = x;
+    let mirrorY = y;
+    let mirrorEdge = "";
+
+    switch (edge) {
+      case "top":
+        mirrorY = y - 1;
+        mirrorEdge = "bottom";
+        break;
+      case "bottom":
+        mirrorY = y + 1;
+        mirrorEdge = "top";
+        break;
+      case "left":
+        mirrorX = x - 1;
+        mirrorEdge = "right";
+        break;
+      case "right":
+        mirrorX = x + 1;
+        mirrorEdge = "left";
+        break;
+    }
+
+    if (mirrorX >= 0 && mirrorX < numCols && mirrorY >= 0 && mirrorY < numRows) {
+      mirrorKey = `${mirrorX},${mirrorY}-${mirrorEdge}`;
+      updates.push([mirrorKey, mirrorEdge]);
+    }
+
+    setPaintedEdges((prev) => {
+      const newMap = new Map(prev);
+      for (const [key] of updates) {
+        if (selectedColor === "rgb(255, 255, 255)") {
+          newMap.delete(key); // borrar
+        } else {
+          newMap.set(key, selectedColor); // pintar
+        }
+      }
+      return newMap;
+    });
+
+    socket.send(JSON.stringify({
+      type: "PAINT_EDGE",
+      payload: {
+        updates: updates.map(([key]) => ({ key, color: selectedColor })),
+      },
+    }));
   };
 
   //#endregion
@@ -314,23 +369,18 @@ export default function GridAdaptativo() {
 
 
   useEffect(() => {
-    const transformer = transformerRef.current;
+    setTimeout(() => {
+      const transformer = transformerRef.current;
+      if (!transformer) return;
 
-    if (!transformer) return;
-
-    if (selectedAreaId) {
-      const node = shapeRefs.current.get(selectedAreaId);
+      const node = selectedAreaId ? shapeRefs.current.get(selectedAreaId) : null;
       if (node) {
         transformer.nodes([node]);
-        transformer.getLayer()?.batchDraw();
       } else {
         transformer.nodes([]);
-        transformer.getLayer()?.batchDraw();
       }
-    } else {
-      transformer.nodes([]);
       transformer.getLayer()?.batchDraw();
-    }
+    }, 0); // Espera un ciclo de render
   }, [selectedAreaId, areaShapes]);
 
   useEffect(() => {
@@ -456,6 +506,12 @@ export default function GridAdaptativo() {
       setAreaShapes(prev => [...prev, baseShape]);
       setSelectedAreaId(id);
       setAreaMode(false); // Desactiva modo después de colocar
+
+      socket.send(JSON.stringify({
+        type: "ADD_AREA",
+        payload: baseShape
+      }));
+
       return;
     }
 
@@ -478,6 +534,13 @@ export default function GridAdaptativo() {
 
       const x = Math.floor(mousePos.x / tileSize);
       const y = Math.floor(mousePos.y / tileSize);
+
+      if (isShiftDown) {
+        setRectEdgePaintStart({ x, y });
+        setIsDrawingEdge(true);
+        return;
+      }
+
       const localX = mousePos.x % tileSize;
       const localY = mousePos.y % tileSize;
 
@@ -537,28 +600,39 @@ export default function GridAdaptativo() {
 
       const x = Math.floor(mousePos.x / tileSize);
       const y = Math.floor(mousePos.y / tileSize);
-      const localX = mousePos.x % tileSize;
-      const localY = mousePos.y % tileSize;
 
-      const margin = 6;
-      let edge = null;
+      if (isShiftDown && rectEdgePaintStart) {
+        // 🟦 Shift + arrastre => pintar bordes del rectángulo
+        const x1 = rectEdgePaintStart.x;
+        const y1 = rectEdgePaintStart.y;
 
-      if (localY < margin) edge = "top";
-      else if (localY > tileSize - margin) edge = "bottom";
-      else if (localX < margin) edge = "left";
-      else if (localX > tileSize - margin) edge = "right";
+        const x2 = x;
+        const y2 = y;
 
-      if (edge) {
-        const key = `${x},${y}-${edge}`;
-        setPaintedEdges((prev) => {
-          const newMap = new Map(prev);
-          if (selectedColor === "rgb(255, 255, 255)") {
-            newMap.delete(key); // 🧽 Borrar línea si es blanco
-          } else {
-            newMap.set(key, selectedColor); // 🎨 Pintar línea
+        for (let i = Math.min(x1, x2); i <= Math.max(x1, x2); i++) {
+          for (let j = Math.min(y1, y2); j <= Math.max(y1, y2); j++) {
+            if (i === Math.min(x1, x2)) paintEdge(i, j, "left");
+            if (i === Math.max(x1, x2)) paintEdge(i, j, "right");
+            if (j === Math.min(y1, y2)) paintEdge(i, j, "top");
+            if (j === Math.max(y1, y2)) paintEdge(i, j, "bottom");
           }
-          return newMap;
-        });
+        }
+      } else {
+        // 🖱️ Pintado normal con el mouse sobre un borde
+        const localX = mousePos.x % tileSize;
+        const localY = mousePos.y % tileSize;
+
+        const margin = 6;
+        let edge = null;
+
+        if (localY < margin) edge = "top";
+        else if (localY > tileSize - margin) edge = "bottom";
+        else if (localX < margin) edge = "left";
+        else if (localX > tileSize - margin) edge = "right";
+
+        if (edge) {
+          paintEdge(x, y, edge);
+        }
       }
 
       return;
@@ -615,6 +689,7 @@ export default function GridAdaptativo() {
     //Terminar de pintar los bordes de las casillas
     if (paintEdgesMode) {
       setIsDrawingEdge(false);
+      setRectEdgePaintStart(null);
     }
 
     //Selecciona todos los tokens completamente contenidos dentro del rectángulo de selección
@@ -687,6 +762,21 @@ export default function GridAdaptativo() {
             })));
             break;
 
+          case "INIT_EDGES":
+            setPaintedEdges(() => {
+              const newMap = new Map<string, string>();
+              for (const key in data.payload) {
+                newMap.set(key, data.payload[key]);
+              }
+              return newMap;
+            });
+            break;
+
+          case "INIT_AREAS":
+            setAreaShapes(Object.values(data.payload));
+            break;
+
+
           case "PAINT_TILE":
             const { x, y, color } = data.payload;
             setPaintedTiles((prev) => {
@@ -696,6 +786,20 @@ export default function GridAdaptativo() {
                 newMap.delete(key);
               } else {
                 newMap.set(key, color);
+              }
+              return newMap;
+            });
+            break;
+
+          case "PAINT_EDGE":
+            setPaintedEdges((prev) => {
+              const newMap = new Map(prev);
+              for (const { key, color } of data.payload.updates) {
+                if (color === "rgb(255, 255, 255)") {
+                  newMap.delete(key);
+                } else {
+                  newMap.set(key, color);
+                }
               }
               return newMap;
             });
@@ -744,6 +848,37 @@ export default function GridAdaptativo() {
                     radius: data.payload.radius,
                   }
                   : t
+              )
+            );
+            break;
+
+          case "ADD_AREA":
+            setAreaShapes(prev => {
+              if (prev.some(a => a.id === data.payload.id)) return prev;
+              return [...prev, data.payload];
+            });
+            break;
+
+          case "MOVE_AREA":
+            setAreaShapes(prev =>
+              prev.map((s) =>
+                s.id === data.payload.id
+                  ? { ...s, x: data.payload.x, y: data.payload.y }
+                  : s
+              )
+            );
+            break;
+
+          case "TRANSFORM_AREA":
+            setAreaShapes(prev =>
+              prev.map((s) =>
+                s.id === data.payload.id
+                  ? {
+                    ...s,
+                    size: data.payload.size,
+                    rotation: data.payload.rotation
+                  }
+                  : s
               )
             );
             break;
@@ -981,7 +1116,7 @@ export default function GridAdaptativo() {
         {/* Canvas Container */}
         <div className="w-full h-full overflow-auto bg-gray-100">
           {/* Stage */}
-          <Stage 
+          <Stage
             width={gridWidth}
             height={gridHeight}
             onMouseDown={handleMouseDown}
@@ -1268,30 +1403,51 @@ export default function GridAdaptativo() {
                   onTap: () => setSelectedAreaId(shape.id),
                   onDragEnd: (e: any) => {
                     const { x, y } = e.target.position();
+
                     setAreaShapes(prev =>
                       prev.map(s =>
                         s.id === shape.id ? { ...s, x, y } : s
                       )
                     );
+
+                    // 🔴 Enviar al servidor
+                    socket.send(JSON.stringify({
+                      type: "MOVE_AREA",
+                      payload: {
+                        id: shape.id,
+                        x,
+                        y
+                      }
+                    }));
                   },
                   onTransformEnd: (e: any) => {
                     const node = e.target;
-                    const scale = node.scaleX();
+                    const scaleX = node.scaleX();
+                    const rotation = node.rotation();
+
+                    // Restaurar escala a 1 para no acumular transformaciones
                     node.scaleX(1);
                     node.scaleY(1);
-                    const rotation = node.rotation();
+
+                    const oldSize = shape.size;
+                    const newSize = oldSize * scaleX;
 
                     setAreaShapes(prev =>
                       prev.map(s =>
                         s.id === shape.id
-                          ? {
-                            ...s,
-                            size: s.size * scale,
-                            rotation,
-                          }
+                          ? { ...s, size: newSize, rotation }
                           : s
                       )
                     );
+
+                    socket.send(JSON.stringify({
+                      type: "TRANSFORM_AREA",
+                      payload: {
+                        id: shape.id,
+                        size: newSize,
+                        rotation
+                      }
+                    }));
                   },
                   onContextMenu: (e: any) => {
                     e.evt.preventDefault();
@@ -1464,7 +1620,7 @@ export default function GridAdaptativo() {
                 </div>
 
                 <Divider className="my-3" />
-                
+
                 <Button
                   color="danger"
                   variant="solid"
@@ -1485,37 +1641,37 @@ export default function GridAdaptativo() {
       </div>
 
       {/* Dice Roller */}
-<div className="absolute bottom-4 right-4 z-10">
-  <Popover placement="top">
-    <PopoverTrigger>
-      <Button
-        isIconOnly
-        variant="shadow"
-        color="primary"
-        className="w-12 h-12 rounded-full shadow-lg hover:scale-105 transition-transform duration-200"
-        aria-label="Lanzar dado"
-      >
-        <Icon icon="fa-solid:dice-d20" width={24} height={24} />
-      </Button>
-    </PopoverTrigger>
-    <PopoverContent className="p-0 w-[300px]">
-      <DiceRoller
-        onRollComplete={(value, diceType, modifier, total) => {
-          console.log(
-            `Roll result: ${value} ${diceType} ${modifier > 0 ? '+' : ''}${modifier} = ${total}`
-          );
-        }}
-      />
-    </PopoverContent>
-  </Popover>
-</div>
+      <div className="absolute bottom-4 right-4 z-10">
+        <Popover placement="top">
+          <PopoverTrigger>
+            <Button
+              isIconOnly
+              variant="shadow"
+              color="primary"
+              className="w-12 h-12 rounded-full shadow-lg hover:scale-105 transition-transform duration-200"
+              aria-label="Lanzar dado"
+            >
+              <Icon icon="fa-solid:dice-d20" width={24} height={24} />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="p-0 w-[300px]">
+            <DiceRoller
+              onRollComplete={(value, diceType, modifier, total) => {
+                console.log(
+                  `Roll result: ${value} ${diceType} ${modifier > 0 ? '+' : ''}${modifier} = ${total}`
+                );
+              }}
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
 
       {/* Keyboard Shortcuts Info */}
       <div className="absolute bottom-4 left-4 z-10">
         <Popover placement="top">
           <PopoverTrigger>
-            <Button 
-              variant="flat" 
+            <Button
+              variant="flat"
               color="default"
               startContent={<Icon icon="lucide:keyboard" width={18} />}
               size="sm"

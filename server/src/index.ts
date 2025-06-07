@@ -18,6 +18,15 @@ let tokens: Record<string, {
     nombre: string;
     vida: string;
 }> = {};
+let paintedEdges: Record<string, string> = {};
+let areas: Record<string, {
+    id: string;
+    x: number;
+    y: number;
+    size: number;
+    type: "circle" | "square" | "cone";
+    rotation?: number;
+}> = {};
 
 
 wss.on("connection", (ws) => {
@@ -33,6 +42,14 @@ wss.on("connection", (ws) => {
         })
     );
 
+    // Enviar estado inicial de bordes pintados
+    ws.send(
+        JSON.stringify({
+            type: "INIT_EDGES",
+            payload: paintedEdges,
+        })
+    );
+
     // Enviar estado inicial de tokens
     ws.send(
         JSON.stringify({
@@ -40,6 +57,12 @@ wss.on("connection", (ws) => {
             payload: tokens, // ahora tiene toda la info
         })
     );
+
+    //Enviar estado inicial de areas
+    ws.send(JSON.stringify({
+        type: "INIT_AREAS",
+        payload: areas,
+    }));
 
     ws.on("message", (data) => {
         const message = JSON.parse(data.toString());
@@ -52,6 +75,16 @@ wss.on("connection", (ws) => {
                 delete paintedTiles[key];
             } else {
                 paintedTiles[key] = color;
+            }
+        }
+
+        if (message.type === "PAINT_EDGE") {
+            for (const { key, color } of message.payload.updates) {
+                if (color === "rgb(255, 255, 255)") {
+                    delete paintedEdges[key];
+                } else {
+                    paintedEdges[key] = color;
+                }
             }
         }
 
@@ -77,6 +110,27 @@ wss.on("connection", (ws) => {
                 tokens[id].x = x;
                 tokens[id].y = y;
                 tokens[id].radius = radius;
+            }
+        }
+
+        if (message.type === "ADD_AREA") {
+            const area = message.payload;
+            areas[area.id] = area;
+        }
+
+        if (message.type === "MOVE_AREA") {
+            const { id, x, y } = message.payload;
+            if (areas[id]) {
+                areas[id].x = x;
+                areas[id].y = y;
+            }
+        }
+
+        if (message.type === "TRANSFORM_AREA") {
+            const { id, size, rotation } = message.payload;
+            if (areas[id]) {
+                areas[id].size = size;
+                areas[id].rotation = rotation;
             }
         }
 
