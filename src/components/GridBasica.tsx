@@ -1142,10 +1142,37 @@ export default function GridAdaptativo() {
                       x={token.x}
                       y={token.y}
                       radius={token.radius}
-                      onMouseDown={() => {
+                      onMouseDown={(e) => {
                         if (moveMode) {
+                          const stage = e.target.getStage();
+                          const pos = stage?.getPointerPosition();
+                          const offsets: { [id: string]: { dx: number; dy: number } } = {};
+                          if (!pos) return;
+
                           setSelectedTokenId(token.id);
+                          if (multiSelectedIds.length > 1 || (multiSelectedIds.length === 1 && multiSelectedIds[0] !== token.id)) {
+                            setMultiSelectedIds([token.id]);
+                          }
                           setIsDraggingPlayer(true);
+                          setDragOffsets(offsets);
+
+                          // Obtener tokens a mover (el seleccionado o todos los múltiples)
+                          const movingIds = multiSelectedIds.length > 0
+                            ? multiSelectedIds.includes(token.id)
+                              ? multiSelectedIds
+                              : [token.id]
+                            : [token.id];
+
+                          for (const t of tokens) {
+                            if (movingIds.includes(t.id)) {
+                              offsets[t.id] = {
+                                dx: t.x - pos.x,
+                                dy: t.y - pos.y,
+                              };
+                            }
+                          }
+
+                          setDragOffsets(offsets);
                         }
                       }}
                       onContextMenu={(e) => {
