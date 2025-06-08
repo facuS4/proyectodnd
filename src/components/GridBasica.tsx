@@ -1298,7 +1298,6 @@ export default function GridAdaptativo() {
                               ? multiSelectedIds
                               : [token.id]
                             : [token.id];
-
                           for (const t of tokens) {
                             if (movingIds.includes(t.id)) {
                               offsets[t.id] = {
