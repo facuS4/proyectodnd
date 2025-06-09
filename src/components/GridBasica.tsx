@@ -364,6 +364,9 @@ export default function GridAdaptativo() {
   const [remoteLaserColors, setRemoteLaserColors] = useState<Record<string, string>>({});
   const [remoteLaserUserId, setRemoteLaserUserId] = useState<string | null>(null);
 
+  // Manejo de popover de color del laser
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+
 
   useEffect(() => {
     if (!laserMode) return;
@@ -1175,16 +1178,26 @@ export default function GridAdaptativo() {
                 Measure
               </Button>
             </Tooltip>
-            <Popover placement="bottom">
+            {/* Botón para activar el modo láser */}
+            <Button
+              color={laserMode ? "primary" : "default"}
+              onClick={() => setActiveTool("laser")}
+              startContent={<Icon icon="lucide:zap" width={20} />}
+              className="px-3 py-2"
+              size="sm"
+            >
+              Laser
+            </Button>
+
+            <Popover isOpen={isPopoverOpen} onOpenChange={setIsPopoverOpen} placement="bottom">
               <PopoverTrigger>
                 <Button
-                  color={laserMode ? "primary" : "default"}
-                  onClick={() => setActiveTool("laser")}
-                  startContent={<Icon icon="lucide:zap" width={20} />}
-                  className="px-3 py-2"
+                  isIconOnly
+                  variant="light"
                   size="sm"
+                // ✅ Elimina el onClick de acá
                 >
-                  Laser
+                  <Icon icon="lucide:settings" width={20} />
                 </Button>
               </PopoverTrigger>
 
@@ -1201,7 +1214,7 @@ export default function GridAdaptativo() {
                       JSON.stringify({
                         type: "SET_LASER_COLOR",
                         payload: {
-                          userId: myId, // reemplazalo con tu identificador único
+                          userId: myId,
                           color: newColor,
                         },
                       })
