@@ -356,8 +356,14 @@ export default function GridAdaptativo() {
   //#region LASER
 
   //Laser
+  const [myId] = useState(() => crypto.randomUUID());
   const [laserMode, setLaserMode] = useState(false);
+  const [laserColor, setLaserColor] = useState("red");
   const [laserPath, setLaserPath] = useState<{ x: number; y: number; time: number }[]>([]);
+  const [remoteLaserPath, setRemoteLaserPath] = useState<{ x: number; y: number; time: number; userId: string }[]>([]);
+  const [remoteLaserColors, setRemoteLaserColors] = useState<Record<string, string>>({});
+  const [remoteLaserUserId, setRemoteLaserUserId] = useState<string | null>(null);
+
 
   useEffect(() => {
     if (!laserMode) return;
@@ -369,6 +375,16 @@ export default function GridAdaptativo() {
 
     return () => clearInterval(interval);
   }, [laserMode]);
+
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setRemoteLaserPath((prev) => prev.filter((p) => now - p.time < 500));
+    }, 50);
+
+    return () => clearInterval(interval);
+  }, []);
 
   //#endregion
 
@@ -443,13 +459,13 @@ export default function GridAdaptativo() {
   //#region EVENTOS
 
   const handleClickStage = (e: any) => {
-      // Si se hace clic en el fondo del Stage (no sobre ningún objeto interactivo)
-      if (e.target === e.target.getStage()) {
-        if (selectedImageId) setSelectedImageId(null);
-        if (selectedAreaId) setSelectedAreaId(null);
-        if (selectedTokenId) setSelectedTokenId(null);
-      }
-    };
+    // Si se hace clic en el fondo del Stage (no sobre ningún objeto interactivo)
+    if (e.target === e.target.getStage()) {
+      if (selectedImageId) setSelectedImageId(null);
+      if (selectedAreaId) setSelectedAreaId(null);
+      if (selectedTokenId) setSelectedTokenId(null);
+    }
+  };
 
   //Apretar el shift
   useEffect(() => {
@@ -629,10 +645,23 @@ export default function GridAdaptativo() {
       const pos = e.target.getStage()?.getPointerPosition();
       if (pos) {
         const now = Date.now();
-        setLaserPath((prev) => [...prev, { x: pos.x, y: pos.y, time: now }]);
+        const point = { x: pos.x, y: pos.y, time: now };
+        setLaserPath((prev) => [...prev, point]);
+
+        socket.send(JSON.stringify({
+          type: "LASER_PATH",
+          payload: {
+            userId: myId,
+            color: laserColor,  // <-- así mandás el color actual
+            path: laserPath,
+          },
+        }));
+
       }
       return;
     }
+
+
 
     //Pintar los bordes de las celdas
     if (paintEdgesMode && isDrawingEdge) {
@@ -958,6 +987,31 @@ export default function GridAdaptativo() {
             setSharedMeasureStart(data.payload.start);
             setSharedMeasureEnd(data.payload.end);
             break;
+
+
+          case "LASER_PATH": {
+            const { userId, color, path } = data.payload;
+
+            setRemoteLaserUserId(userId); // ← este es el que usás después
+            setRemoteLaserColors((prev) => ({
+              ...prev,
+              [userId]: color || "red",
+            }));
+
+            setRemoteLaserPath(path);
+            break;
+          }
+
+
+
+          case "SET_LASER_COLOR": {
+            const { userId, color } = data.payload;
+            setRemoteLaserColors(prev => ({
+              ...prev,
+              [userId]: color,
+            }));
+            break;
+          }
         }
       } catch (err) {
         console.error("Error al parsear mensaje WebSocket:", err);
@@ -1121,17 +1175,42 @@ export default function GridAdaptativo() {
                 Measure
               </Button>
             </Tooltip>
-            <Tooltip content="Laser pointer" placement="bottom">
-              <Button
-                color={laserMode ? "primary" : "default"}
-                onClick={() => setActiveTool("laser")}
-                startContent={<Icon icon="lucide:zap" width={20} />}
-                className="px-3 py-2"
-                size="sm"
-              >
-                Laser
-              </Button>
-            </Tooltip>
+            <Popover placement="bottom">
+              <PopoverTrigger>
+                <Button
+                  color={laserMode ? "primary" : "default"}
+                  onClick={() => setActiveTool("laser")}
+                  startContent={<Icon icon="lucide:zap" width={20} />}
+                  className="px-3 py-2"
+                  size="sm"
+                >
+                  Laser
+                </Button>
+              </PopoverTrigger>
+
+              <PopoverContent className="p-4 w-40">
+                <label className="block text-sm font-medium mb-2">Color del Láser:</label>
+                <input
+                  type="color"
+                  value={laserColor}
+                  onChange={(e) => {
+                    const newColor = e.target.value;
+                    setLaserColor(newColor);
+
+                    socket.send(
+                      JSON.stringify({
+                        type: "SET_LASER_COLOR",
+                        payload: {
+                          userId: myId, // reemplazalo con tu identificador único
+                          color: newColor,
+                        },
+                      })
+                    );
+                  }}
+                  className="w-full h-10 cursor-pointer border border-default-200 rounded"
+                />
+              </PopoverContent>
+            </Popover>
           </ButtonGroup>
         </div>
 
@@ -1614,13 +1693,28 @@ export default function GridAdaptativo() {
               {laserMode && laserPath.length > 1 && (
                 <Line
                   points={laserPath.flatMap((p) => [p.x, p.y])}
-                  stroke="red"
+                  stroke={laserColor}
                   strokeWidth={4}
                   lineCap="round"
                   lineJoin="round"
                   tension={0.4}
                   opacity={0.5}
                   shadowColor="red"
+                  shadowBlur={20}
+                  shadowOpacity={0.6}
+                />
+              )}
+
+              {remoteLaserPath.length > 1 && remoteLaserUserId && (
+                <Line
+                  points={remoteLaserPath.flatMap((p) => [p.x, p.y])}
+                  stroke={remoteLaserColors[remoteLaserUserId] || "red"}
+                  strokeWidth={4}
+                  lineCap="round"
+                  lineJoin="round"
+                  tension={0.4}
+                  opacity={0.5}
+                  shadowColor={remoteLaserColors[remoteLaserUserId] || "red"}
                   shadowBlur={20}
                   shadowOpacity={0.6}
                 />

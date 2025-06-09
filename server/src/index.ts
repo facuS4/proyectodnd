@@ -29,6 +29,9 @@ let areas: Record<string, {
 }> = {};
 let currentMeasurement: { start: { x: number, y: number }, end: { x: number, y: number } } | null = null;
 
+// Estado del Laser 
+let laserColors: Record<string, string> = {};
+
 
 
 wss.on("connection", (ws) => {
@@ -149,6 +152,39 @@ wss.on("connection", (ws) => {
         } else {
             currentMeasurement = null;
         }
+
+        if (message.type === "LASER_PATH") {
+            const { userId, color } = message.payload;
+
+            // Guardar el color por usuario
+            if (userId && color) {
+                laserColors[userId] = color;
+            }
+
+            // Retransmitir a otros
+            for (const client of clients) {
+                if (client !== ws && client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify(message));
+                }
+            }
+
+            return; // ⚠️ importante
+        }
+
+
+        if (message.type === "SET_LASER_COLOR") {
+            const { userId, color } = message.payload;
+            laserColors[userId] = color;
+
+            // Reenviar a todos (menos el que envió)
+            for (const client of clients) {
+                if (client !== ws && client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify(message));
+                }
+            }
+            return;
+        }
+
 
         // Broadcast
         for (const client of clients) {
