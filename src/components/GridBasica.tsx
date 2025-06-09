@@ -766,6 +766,15 @@ export default function GridAdaptativo() {
   const [moveMode, setMoveMode] = useState(false);
   const [isDraggingPlayer, setIsDraggingPlayer] = useState(false);
 
+  const setActiveTool = (tool: "paint" | "move" | "measure" | "laser" | "edges" | "circle" | "square" | "cone" | false) => {
+    setPaintMode(tool === "paint");
+    setMoveMode(tool === "move");
+    setMeasureMode(tool === "measure");
+    setLaserMode(tool === "laser");
+    setPaintEdgesMode(tool === "edges");
+    setAreaMode(tool === "circle" || tool === "square" || tool === "cone" ? tool : false);
+  };
+
   //#endregion
 
   //#region SOCKETS
@@ -1017,7 +1026,7 @@ export default function GridAdaptativo() {
             <Tooltip content="Paint tiles" placement="bottom">
               <Button
                 color={paintMode ? "primary" : "default"}
-                onClick={togglePaintMode}
+                onClick={() => setActiveTool("paint")}
                 startContent={<Icon icon="lucide:paintbrush" width={20} />}
                 className="px-3 py-2"
                 size="sm"
@@ -1028,17 +1037,7 @@ export default function GridAdaptativo() {
             <Tooltip content="Paint edges" placement="bottom">
               <Button
                 color={paintEdgesMode ? "primary" : "default"}
-                onClick={() => {
-                  setPaintEdgesMode((prev) => {
-                    if (!prev) {
-                      setPaintMode(false);
-                      setMoveMode(false);
-                      setMeasureMode(false);
-                      setAreaMode(false);
-                    }
-                    return !prev;
-                  });
-                }}
+                onClick={() => setActiveTool("edges")}
                 startContent={<Icon icon="lucide:square" width={20} />}
                 className="px-3 py-2"
                 size="sm"
@@ -1049,7 +1048,7 @@ export default function GridAdaptativo() {
             <Tooltip content="Move tokens" placement="bottom">
               <Button
                 color={moveMode ? "primary" : "default"}
-                onClick={toggleMoveMode}
+                onClick={() => setActiveTool("move")}
                 startContent={<Icon icon="lucide:move" width={20} />}
                 className="px-3 py-2"
                 size="sm"
@@ -1060,13 +1059,7 @@ export default function GridAdaptativo() {
             <Tooltip content="Measure distance" placement="bottom">
               <Button
                 color={measureMode ? "primary" : "default"}
-                onClick={() => {
-                  setMeasureMode((prev) => !prev);
-                  setMeasureStart(null);
-                  setMeasureEnd(null);
-                  setPaintMode(false);
-                  setMoveMode(false);
-                }}
+                onClick={() => setActiveTool("measure")}
                 startContent={<Icon icon="lucide:ruler" width={20} />}
                 className="px-3 py-2"
                 size="sm"
@@ -1077,13 +1070,7 @@ export default function GridAdaptativo() {
             <Tooltip content="Laser pointer" placement="bottom">
               <Button
                 color={laserMode ? "primary" : "default"}
-                onClick={() => {
-                  setLaserMode((prev) => !prev);
-                  setPaintMode(false);
-                  setMoveMode(false);
-                  setMeasureMode(false);
-                  setPaintEdgesMode(false);
-                }}
+                onClick={() => setActiveTool("laser")}
                 startContent={<Icon icon="lucide:zap" width={20} />}
                 className="px-3 py-2"
                 size="sm"
@@ -1100,12 +1087,7 @@ export default function GridAdaptativo() {
             <Tooltip content="Add circle area" placement="bottom">
               <Button
                 color={areaMode === "circle" ? "primary" : "default"}
-                onClick={() => {
-                  setAreaMode("circle");
-                  setPaintMode(false);
-                  setMoveMode(false);
-                  setMeasureMode(false);
-                }}
+                onClick={() => setActiveTool("circle")}
                 startContent={<Icon icon="lucide:circle" width={20} />}
                 className="px-3 py-2"
                 size="sm"
@@ -1116,12 +1098,7 @@ export default function GridAdaptativo() {
             <Tooltip content="Add square area" placement="bottom">
               <Button
                 color={areaMode === "square" ? "primary" : "default"}
-                onClick={() => {
-                  setAreaMode("square");
-                  setPaintMode(false);
-                  setMoveMode(false);
-                  setMeasureMode(false);
-                }}
+                onClick={() => setActiveTool("square")}
                 startContent={<Icon icon="lucide:square" width={20} />}
                 className="px-3 py-2"
                 size="sm"
@@ -1132,12 +1109,7 @@ export default function GridAdaptativo() {
             <Tooltip content="Add cone area" placement="bottom">
               <Button
                 color={areaMode === "cone" ? "primary" : "default"}
-                onClick={() => {
-                  setAreaMode("cone");
-                  setPaintMode(false);
-                  setMoveMode(false);
-                  setMeasureMode(false);
-                }}
+                onClick={() => setActiveTool("cone")}
                 startContent={<Icon icon="lucide:triangle" width={20} />}
                 className="px-3 py-2"
                 size="sm"
