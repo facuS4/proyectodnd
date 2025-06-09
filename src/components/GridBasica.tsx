@@ -1463,7 +1463,7 @@ export default function GridAdaptativo() {
                     y={token.y - token.radius - 18}
                     width={token.radius * 2}
                     align="center"
-                    text={token.vida}
+                    text={token.vida === "0" ? "💀" : token.vida}
                     fontSize={12}
                     fill="black"
                     fontStyle="bold"
