@@ -627,6 +627,12 @@ export default function GridAdaptativo() {
       }
       return;
     }
+
+    //Deseleccionar Imagen
+    if (selectedImageId) {
+      setSelectedImageId(null);
+      return;
+    }
   };
 
   //Eventos al mover el cursor
