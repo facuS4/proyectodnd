@@ -136,6 +136,11 @@ wss.on("connection", (ws) => {
             }
         }
 
+        if (message.type === "DELETE_AREA") {
+            const { id } = message.payload;
+            delete areas[id];
+        }
+
         if (message.type === "MEASURE") {
             currentMeasurement = {
                 start: message.payload.start,

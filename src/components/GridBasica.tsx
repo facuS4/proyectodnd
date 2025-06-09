@@ -925,6 +925,10 @@ export default function GridAdaptativo() {
             );
             break;
 
+          case "DELETE_AREA":
+            setAreaShapes(prev => prev.filter(a => a.id !== data.payload.id));
+            break;
+
           case "MEASURE":
             setSharedMeasureStart(data.payload.start);
             setSharedMeasureEnd(data.payload.end);
@@ -1462,6 +1466,11 @@ export default function GridAdaptativo() {
                     e.evt.preventDefault();
                     setAreaShapes(prev => prev.filter(s => s.id !== shape.id));
                     if (selectedAreaId === shape.id) setSelectedAreaId(null);
+
+                    socket.send(JSON.stringify({
+                      type: "DELETE_AREA",
+                      payload: { id: shape.id }
+                    }));
                   },
                 };
 
