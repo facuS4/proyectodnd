@@ -329,6 +329,38 @@ export default function GridAdaptativo() {
 
   //#endregion
 
+  //#region BACKGROUND IMAGES
+
+  type ImageShape = {
+    id: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    image: HTMLImageElement;
+  };
+
+  const [imageShapes, setImageShapes] = useState<ImageShape[]>([]);
+  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
+  const imageTransformerRef = useRef<any>(null);
+  const imageShapeRefs = useRef<Map<string, any>>(new Map());
+
+  useEffect(() => {
+    const transformer = imageTransformerRef.current;
+    if (!transformer) return;
+
+    const node = selectedImageId ? imageShapeRefs.current.get(selectedImageId) : null;
+    if (node) {
+      transformer.nodes([node]);
+    } else {
+      transformer.nodes([]);
+    }
+
+    transformer.getLayer()?.batchDraw();
+  }, [selectedImageId, imageShapes]);
+
+  //#endregion
+
   //#region LASER
 
   //Laser
@@ -976,22 +1008,16 @@ export default function GridAdaptativo() {
               const img = new window.Image();
               img.src = URL.createObjectURL(file);
               img.onload = () => {
-                const canvas = document.createElement("canvas");
-                canvas.width = img.height;
-                canvas.height = img.width;
-                const ctx = canvas.getContext("2d");
-
-                if (ctx) {
-                  ctx.translate(canvas.width / 2, canvas.height / 2);
-                  ctx.rotate(-Math.PI / 2);
-                  ctx.drawImage(img, -img.width / 2, -img.height / 2);
-                }
-
-                const rotatedImg = new window.Image();
-                rotatedImg.src = canvas.toDataURL();
-                rotatedImg.onload = () => {
-                  setBackgroundImage(rotatedImg);
+                const id = crypto.randomUUID();
+                const newShape: ImageShape = {
+                  id,
+                  x: gridWidth / 2 - img.width / 2,
+                  y: gridHeight / 2 - img.height / 2,
+                  width: img.width,
+                  height: img.height, // para compatibilidad, aunque podrías eliminar esto
+                  image: img,
                 };
+                setImageShapes(prev => [...prev, newShape]);
               };
             }
           }}
@@ -1151,15 +1177,60 @@ export default function GridAdaptativo() {
             tabIndex={0}
           >
             <Layer>
-              {backgroundImage && (
-                <Image
-                  image={backgroundImage}
-                  x={(gridWidth - backgroundImage.width) / 2}
-                  y={(gridHeight - backgroundImage.height) / 2}
-                  width={backgroundImage.width}
-                  height={backgroundImage.height}
+              {imageShapes.map((shape) => (
+                <Rect
+                  x={shape.x}
+                  y={shape.y}
+                  width={shape.width}
+                  height={shape.height}
+                  fillPatternImage={shape.image}
+                  fillPatternScale={{
+                    x: shape.width / shape.image.width,
+                    y: shape.height / shape.image.height,
+                  }}
+                  stroke="black"
+                  strokeWidth={selectedImageId === shape.id ? 2 : 0}
+                  draggable
+                  onClick={() => setSelectedImageId(shape.id)}
+                  onTap={() => setSelectedImageId(shape.id)}
+                  ref={(node) => {
+                    if (node) imageShapeRefs.current.set(shape.id, node);
+                  }}
+                  onDragEnd={(e) => {
+                    const { x, y } = e.target.position();
+                    setImageShapes(prev =>
+                      prev.map(s => (s.id === shape.id ? { ...s, x, y } : s))
+                    );
+                  }}
+                  onTransformEnd={(e) => {
+                    const node = e.target;
+                    const scaleX = node.scaleX();
+                    const scaleY = node.scaleY();
+
+                    node.scaleX(1);
+                    node.scaleY(1);
+
+                    setImageShapes(prev =>
+                      prev.map(s =>
+                        s.id === shape.id
+                          ? {
+                            ...s,
+                            x: node.x(),
+                            y: node.y(),
+                            width: s.width * scaleX,
+                            height: s.height * scaleY,
+                          }
+                          : s
+                      )
+                    );
+                  }}
                 />
-              )}
+              ))}
+              <Transformer
+                ref={imageTransformerRef}
+                enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
+                rotateEnabled={false}
+              />
 
               {drawGrid()}
 
