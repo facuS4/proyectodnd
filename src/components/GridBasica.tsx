@@ -1,6 +1,6 @@
 import { Stage, Layer, Rect, Line } from "react-konva";
 import { useRef, useState, useEffect } from "react";
-import { Circle, Text, Image, Transformer } from "react-konva";
+import { Circle, Text, Transformer } from "react-konva";
 import CircularToken from "./CircularTokenProps";
 import AudioPanel from "./AudioPanel";
 import { DiceRoller } from "./diceroller";
@@ -27,7 +27,7 @@ export default function GridAdaptativo() {
   const tileSize = Math.min(tileSizeW, tileSizeH);
 
   // Estado para la imagen del fondo
-  const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
+  const [backgroundImage] = useState<HTMLImageElement | null>(null);
 
   //Dibujar la Grid
   const drawGrid = () => {
@@ -265,14 +265,6 @@ export default function GridAdaptativo() {
     );
   };
 
-  // Cambiar paintMode
-  const togglePaintMode = () => {
-    setPaintMode((prev) => {
-      if (!prev) setMoveMode(false); // Al activar pintar, desactiva mover
-      return !prev;
-    });
-  };
-
   const paintEdge = (x: number, y: number, edge: string) => {
     const key = `${x},${y}-${edge}`;
     const updates: [string, string][] = [[key, edge]];
@@ -450,6 +442,15 @@ export default function GridAdaptativo() {
 
   //#region EVENTOS
 
+  const handleClickStage = (e: any) => {
+      // Si se hace clic en el fondo del Stage (no sobre ningún objeto interactivo)
+      if (e.target === e.target.getStage()) {
+        if (selectedImageId) setSelectedImageId(null);
+        if (selectedAreaId) setSelectedAreaId(null);
+        if (selectedTokenId) setSelectedTokenId(null);
+      }
+    };
+
   //Apretar el shift
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -470,14 +471,6 @@ export default function GridAdaptativo() {
       window.removeEventListener("keyup", handleKeyUp);
     };
   }, []);
-
-  // Cambiar a moverse con el mouse
-  const toggleMoveMode = () => {
-    setMoveMode((prev) => {
-      if (!prev) setPaintMode(false); // Al activar mover, desactiva pintar
-      return !prev;
-    });
-  };
 
   // Movimiento con mouse
   const handleMouseMovePlayer = (e: any) => {
@@ -625,12 +618,6 @@ export default function GridAdaptativo() {
       } else {
         paintTile(x, y);
       }
-      return;
-    }
-
-    //Deseleccionar Imagen
-    if (selectedImageId) {
-      setSelectedImageId(null);
       return;
     }
   };
@@ -1015,15 +1002,17 @@ export default function GridAdaptativo() {
               img.src = URL.createObjectURL(file);
               img.onload = () => {
                 const id = crypto.randomUUID();
-                const newShape: ImageShape = {
-                  id,
-                  x: gridWidth / 2 - img.width / 2,
-                  y: gridHeight / 2 - img.height / 2,
-                  width: img.width,
-                  height: img.height, // para compatibilidad, aunque podrías eliminar esto
-                  image: img,
-                };
-                setImageShapes(prev => [...prev, newShape]);
+                setImageShapes((prev) => [
+                  ...prev,
+                  {
+                    id,
+                    x: gridWidth / 2 - img.width / 2,
+                    y: gridHeight / 2 - img.height / 2,
+                    width: img.width,
+                    height: img.height,
+                    image: img,
+                  },
+                ]);
               };
             }
           }}
@@ -1194,7 +1183,10 @@ export default function GridAdaptativo() {
           <Stage
             width={gridWidth}
             height={gridHeight}
-            onMouseDown={handleMouseDown}
+            onMouseDown={(e) => {
+              handleMouseDown(e);
+              handleClickStage(e); // 👈 para no interrumpir otras lógicas
+            }}
             onMouseMove={(e) => {
               handleMouseMove(e);
               handleMouseMovePlayer(e);
@@ -1212,31 +1204,30 @@ export default function GridAdaptativo() {
             tabIndex={0}
           >
             <Layer>
+              {drawGrid()}
+
               {imageShapes.map((shape) => (
                 <Rect
+                  key={shape.id}
                   x={shape.x}
                   y={shape.y}
                   width={shape.width}
                   height={shape.height}
                   fillPatternImage={shape.image}
                   fillPatternScale={{
-                    x: shape.width / shape.image.width,
-                    y: shape.height / shape.image.height,
+                    x: shape.width / (shape.image?.width || 1),
+                    y: shape.height / (shape.image?.height || 1),
                   }}
+                  offsetX={0}
+                  offsetY={0}
                   stroke="black"
                   strokeWidth={selectedImageId === shape.id ? 2 : 0}
                   draggable
-                  onClick={() => setSelectedImageId(shape.id)}
-                  onTap={() => setSelectedImageId(shape.id)}
                   ref={(node) => {
                     if (node) imageShapeRefs.current.set(shape.id, node);
+                    else imageShapeRefs.current.delete(shape.id);
                   }}
-                  onDragEnd={(e) => {
-                    const { x, y } = e.target.position();
-                    setImageShapes(prev =>
-                      prev.map(s => (s.id === shape.id ? { ...s, x, y } : s))
-                    );
-                  }}
+                  onClick={() => setSelectedImageId(shape.id)}
                   onTransformEnd={(e) => {
                     const node = e.target;
                     const scaleX = node.scaleX();
@@ -1245,16 +1236,13 @@ export default function GridAdaptativo() {
                     node.scaleX(1);
                     node.scaleY(1);
 
-                    setImageShapes(prev =>
-                      prev.map(s =>
+                    const newWidth = shape.width * scaleX;
+                    const newHeight = shape.height * scaleY;
+
+                    setImageShapes((prev) =>
+                      prev.map((s) =>
                         s.id === shape.id
-                          ? {
-                            ...s,
-                            x: node.x(),
-                            y: node.y(),
-                            width: s.width * scaleX,
-                            height: s.height * scaleY,
-                          }
+                          ? { ...s, x: node.x(), y: node.y(), width: newWidth, height: newHeight }
                           : s
                       )
                     );
@@ -1266,8 +1254,6 @@ export default function GridAdaptativo() {
                 enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
                 rotateEnabled={false}
               />
-
-              {drawGrid()}
 
               {/* Area de Selección */}
               {selectionRect && (
