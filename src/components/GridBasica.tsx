@@ -1056,6 +1056,20 @@ export default function GridAdaptativo() {
           </Button>
         </Tooltip>
 
+        <Tooltip content="Clear background image">
+          <Button
+            color="default"
+            variant="flat"
+            startContent={<Icon icon="lucide:trash" />}
+            onClick={() => {
+              setImageShapes([]);
+              setSelectedImageId(null);
+            }}
+          >
+            Clear Background
+          </Button>
+        </Tooltip>
+
         {/* Spacer + Add Token */}
         <div className="ml-auto">
           <Button
