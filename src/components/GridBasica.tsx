@@ -407,6 +407,13 @@ export default function GridAdaptativo() {
   const [measureStart, setMeasureStart] = useState<{ x: number; y: number } | null>(null);
   const [measureEnd, setMeasureEnd] = useState<{ x: number; y: number } | null>(null);
 
+  const [sharedMeasureStart, setSharedMeasureStart] = useState<{ x: number; y: number } | null>(null);
+  const [sharedMeasureEnd, setSharedMeasureEnd] = useState<{ x: number; y: number } | null>(null);
+
+  const effectiveStart = measureStart ?? sharedMeasureStart;
+  const effectiveEnd = measureEnd ?? sharedMeasureEnd;
+
+
   //#endregion
 
   //#region EVENTOS
@@ -484,6 +491,14 @@ export default function GridAdaptativo() {
         const y = Math.floor(mousePos.y / tileSize);
         setMeasureStart({ x, y });
         setMeasureEnd({ x, y });
+
+        socket.send(JSON.stringify({
+          type: "MEASURE",
+          payload: {
+            start: { x, y },
+            end: { x, y },
+          }
+        }));
       }
       return;
     }
@@ -659,6 +674,14 @@ export default function GridAdaptativo() {
         const x = Math.floor(mousePos.x / tileSize);
         const y = Math.floor(mousePos.y / tileSize);
         setMeasureEnd({ x, y });
+
+        socket.send(JSON.stringify({
+          type: "MEASURE",
+          payload: {
+            start: measureStart,
+            end: { x, y },
+          }
+        }));
       }
     }
 
@@ -720,6 +743,15 @@ export default function GridAdaptativo() {
     if (measureMode && measureStart && measureEnd) {
       setMeasureStart(null);
       setMeasureEnd(null);
+
+      socket.send(JSON.stringify({
+        type: "MEASURE",
+        payload: {
+          start: null,
+          end: null,
+        }
+      }));
+
       return;
     }
 
@@ -882,6 +914,11 @@ export default function GridAdaptativo() {
                   : s
               )
             );
+            break;
+
+          case "MEASURE":
+            setSharedMeasureStart(data.payload.start);
+            setSharedMeasureEnd(data.payload.end);
             break;
         }
       } catch (err) {
@@ -1214,40 +1251,40 @@ export default function GridAdaptativo() {
               })}
 
               {/* Regla */}
-              {measureMode && measureStart && measureEnd && (
+
+              {effectiveStart && effectiveEnd && (
                 <>
                   <Line
                     points={[
-                      measureStart.x * tileSize + tileSize / 2,
-                      measureStart.y * tileSize + tileSize / 2,
-                      measureEnd.x * tileSize + tileSize / 2,
-                      measureEnd.y * tileSize + tileSize / 2,
+                      effectiveStart.x * tileSize + tileSize / 2,
+                      effectiveStart.y * tileSize + tileSize / 2,
+                      effectiveEnd.x * tileSize + tileSize / 2,
+                      effectiveEnd.y * tileSize + tileSize / 2,
                     ]}
                     stroke="black"
                     strokeWidth={2}
                     dash={[10, 5]}
                   />
                   <Text
-                    x={((measureStart.x + measureEnd.x) / 2) * tileSize}
-                    y={((measureStart.y + measureEnd.y) / 2) * tileSize}
+                    x={((effectiveStart.x + effectiveEnd.x) / 2) * tileSize}
+                    y={((effectiveStart.y + effectiveEnd.y) / 2) * tileSize}
                     text={`${Math.round(
                       Math.sqrt(
-                        Math.pow(measureEnd.x - measureStart.x, 2) +
-                        Math.pow(measureEnd.y - measureStart.y, 2)
+                        Math.pow(effectiveEnd.x - effectiveStart.x, 2) +
+                        Math.pow(effectiveEnd.y - effectiveStart.y, 2)
                       ) * 5
                     )} pies`}
                     fontSize={14}
                     fill="black"
                     fontStyle="bold"
                   />
-                  {/* Circunferencia de radio igual a la distancia */}
                   <Circle
-                    x={measureStart.x * tileSize + tileSize / 2}
-                    y={measureStart.y * tileSize + tileSize / 2}
+                    x={effectiveStart.x * tileSize + tileSize / 2}
+                    y={effectiveStart.y * tileSize + tileSize / 2}
                     radius={
                       Math.sqrt(
-                        Math.pow(measureEnd.x - measureStart.x, 2) +
-                        Math.pow(measureEnd.y - measureStart.y, 2)
+                        Math.pow(effectiveEnd.x - effectiveStart.x, 2) +
+                        Math.pow(effectiveEnd.y - effectiveStart.y, 2)
                       ) * tileSize
                     }
                     stroke="black"

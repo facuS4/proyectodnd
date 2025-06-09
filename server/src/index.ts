@@ -27,6 +27,8 @@ let areas: Record<string, {
     type: "circle" | "square" | "cone";
     rotation?: number;
 }> = {};
+let currentMeasurement: { start: { x: number, y: number }, end: { x: number, y: number } } | null = null;
+
 
 
 wss.on("connection", (ws) => {
@@ -132,6 +134,15 @@ wss.on("connection", (ws) => {
                 areas[id].size = size;
                 areas[id].rotation = rotation;
             }
+        }
+
+        if (message.type === "MEASURE") {
+            currentMeasurement = {
+                start: message.payload.start,
+                end: message.payload.end,
+            };
+        } else {
+            currentMeasurement = null;
         }
 
         // Broadcast
