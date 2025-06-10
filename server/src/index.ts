@@ -32,6 +32,26 @@ let currentMeasurement: { start: { x: number, y: number }, end: { x: number, y: 
 // Estado del Laser 
 let laserColors: Record<string, string> = {};
 
+// Estado Compartido Imagenes
+let backgroundImages: {
+    id: string;
+    src: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}[] = [];
+
+let imageShapes: Record<string, {
+  id: string;
+  src: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}> = {};
+
+
 
 
 wss.on("connection", (ws) => {
@@ -67,6 +87,11 @@ wss.on("connection", (ws) => {
     ws.send(JSON.stringify({
         type: "INIT_AREAS",
         payload: areas,
+    }));
+
+    ws.send(JSON.stringify({
+        type: "INIT_BACKGROUND_IMAGES",
+        payload: backgroundImages,
     }));
 
     ws.on("message", (data) => {
@@ -185,6 +210,37 @@ wss.on("connection", (ws) => {
             return;
         }
 
+        if (message.type === "ADD_BACKGROUND_IMAGE") {
+            const { id, src, x, y, width, height } = message.payload;
+
+            // Guardar en el estado compartido
+            backgroundImages.push({ id, src, x, y, width, height });
+
+            // Broadcast a los demás
+            for (const client of clients) {
+                if (client !== ws && client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify(message));
+                }
+            }
+            return; // Evitamos que el mensaje se retransmita de nuevo más abajo
+        }
+
+        if (message.type === "DELETE_BACKGROUND_IMAGE") {
+            const { id } = message.payload;
+            // No hay que almacenar nada en el servidor, solo retransmitir
+        }
+
+        if (message.type === "CLEAR_BACKGROUND_IMAGES") {
+            // Limpiar todas las imágenes de fondo en el servidor
+            imageShapes = {}; // O [] si usas arreglo, pero mejor un objeto como en tokens
+
+            // Reenviar a todos los clientes, menos al que envió
+            for (const client of clients) {
+                if (client !== ws && client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify(message));
+                }
+            }
+        }
 
         // Broadcast
         for (const client of clients) {

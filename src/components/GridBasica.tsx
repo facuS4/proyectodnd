@@ -1005,8 +1005,6 @@ export default function GridAdaptativo() {
             break;
           }
 
-
-
           case "SET_LASER_COLOR": {
             const { userId, color } = data.payload;
             setRemoteLaserColors(prev => ({
@@ -1015,6 +1013,37 @@ export default function GridAdaptativo() {
             }));
             break;
           }
+
+          case "ADD_BACKGROUND_IMAGE": {
+            const { id, src, x, y, width, height } = data.payload;
+
+            const img = new window.Image();
+            img.src = src;
+            img.onload = () => {
+              setImageShapes(prev => [
+                ...prev,
+                {
+                  id,
+                  x,
+                  y,
+                  width,
+                  height,
+                  image: img, // ahora sí es un HTMLImageElement
+                },
+              ]);
+            };
+            break;
+          }
+
+          case "DELETE_BACKGROUND_IMAGE":
+            const { id: deletedId } = data.payload;
+            setImageShapes(prev => prev.filter(img => img.id !== deletedId));
+            break;
+
+          case "CLEAR_BACKGROUND_IMAGES":
+            setImageShapes([]);  // vacía el arreglo de imágenes de fondo
+            setSelectedImageId(null);  // si tenés seleccionado alguna imagen, la deselecciona
+            break;
         }
       } catch (err) {
         console.error("Error al parsear mensaje WebSocket:", err);
@@ -1055,25 +1084,46 @@ export default function GridAdaptativo() {
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) {
-              const img = new window.Image();
-              img.src = URL.createObjectURL(file);
-              img.onload = () => {
-                const id = crypto.randomUUID();
-                setImageShapes((prev) => [
-                  ...prev,
-                  {
+              const reader = new FileReader();
+              reader.onload = () => {
+                const base64 = reader.result as string;
+
+                const img = new window.Image();
+                img.src = base64;
+                img.onload = () => {
+                  const id = crypto.randomUUID();
+                  const newImage = {
                     id,
                     x: gridWidth / 2 - img.width / 2,
                     y: gridHeight / 2 - img.height / 2,
                     width: img.width,
                     height: img.height,
                     image: img,
-                  },
-                ]);
+                  };
+
+                  // Mostrar en este cliente
+                  setImageShapes(prev => [...prev, newImage]);
+
+                  // Enviar a otros
+                  socket.send(JSON.stringify({
+                    type: "ADD_BACKGROUND_IMAGE",
+                    payload: {
+                      id,
+                      src: base64,
+                      x: newImage.x,
+                      y: newImage.y,
+                      width: newImage.width,
+                      height: newImage.height,
+                    },
+                  }));
+                };
               };
+              reader.readAsDataURL(file);
             }
           }}
+
         />
+
 
         {/* Background Button */}
         <Tooltip content="Upload background image">
@@ -1094,8 +1144,16 @@ export default function GridAdaptativo() {
             startContent={<Icon icon="lucide:trash" />}
             onClick={() => {
               if (!selectedImageId) return;
+
+              // Eliminar localmente
               setImageShapes(prev => prev.filter(img => img.id !== selectedImageId));
               setSelectedImageId(null);
+
+              // Enviar al servidor
+              socket.send(JSON.stringify({
+                type: "DELETE_BACKGROUND_IMAGE",
+                payload: { id: selectedImageId },
+              }));
             }}
           >
             Remove Background
@@ -1110,6 +1168,11 @@ export default function GridAdaptativo() {
             onClick={() => {
               setImageShapes([]);
               setSelectedImageId(null);
+
+              socket.send(JSON.stringify({
+                type: "CLEAR_BACKGROUND_IMAGES",
+              }));
+
             }}
           >
             Clear Background
