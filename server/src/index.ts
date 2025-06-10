@@ -240,19 +240,53 @@ wss.on("connection", (ws) => {
 
         if (message.type === "DELETE_BACKGROUND_IMAGE") {
             const { id } = message.payload;
-            // No hay que almacenar nada en el servidor, solo retransmitir
-        }
 
-        if (message.type === "CLEAR_BACKGROUND_IMAGES") {
-            // Limpiar todas las imágenes de fondo en el servidor
-            imageShapes = {}; // O [] si usas arreglo, pero mejor un objeto como en tokens
+            // Eliminar del estado compartido
+            backgroundImages = backgroundImages.filter((img) => img.id !== id);
 
-            // Reenviar a todos los clientes, menos al que envió
+            // Reenviar a los demás
             for (const client of clients) {
                 if (client !== ws && client.readyState === WebSocket.OPEN) {
                     client.send(JSON.stringify(message));
                 }
             }
+
+            return;
+        }
+
+        if (message.type === "CLEAR_BACKGROUND_IMAGES") {
+            // Limpiar todas las imágenes de fondo en el servidor
+            backgroundImages = [];
+
+            for (const client of clients) {
+                if (client !== ws && client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify(message));
+                }
+            }
+
+            return;
+        }
+
+        if (message.type === "MOVE_BACKGROUND_IMAGE") {
+            const { id, x, y, width, height } = message.payload;
+
+            // Actualizar la posición en el servidor
+            const image = backgroundImages.find((img) => img.id === id);
+            if (image) {
+                image.x = x;
+                image.y = y;
+                image.width = width;
+                image.height = height;
+            }
+
+            // Reenviar a todos los demás
+            for (const client of clients) {
+                if (client !== ws && client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify(message));
+                }
+            }
+
+            return;
         }
 
         // Broadcast

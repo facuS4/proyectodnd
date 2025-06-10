@@ -875,6 +875,31 @@ export default function GridAdaptativo() {
             setAreaShapes(Object.values(data.payload));
             break;
 
+          case "INIT_BACKGROUND_IMAGES": {
+            const images = data.payload;
+
+            for (const imgData of images) {
+              const img = new window.Image();
+              img.src = imgData.src;
+
+              img.onload = () => {
+                setImageShapes((prev) => [
+                  ...prev,
+                  {
+                    id: imgData.id,
+                    x: imgData.x,
+                    y: imgData.y,
+                    width: imgData.width,
+                    height: imgData.height,
+                    image: img,
+                  },
+                ]);
+              };
+            }
+
+            break;
+          }
+
 
           case "PAINT_TILE":
             const { x, y, color } = data.payload;
@@ -1045,9 +1070,19 @@ export default function GridAdaptativo() {
             break;
 
           case "CLEAR_BACKGROUND_IMAGES":
-            setImageShapes([]);  // vacía el arreglo de imágenes de fondo
-            setSelectedImageId(null);  // si tenés seleccionado alguna imagen, la deselecciona
+            setImageShapes([]);
+            setSelectedImageId(null);
             break;
+
+          case "MOVE_BACKGROUND_IMAGE": {
+            const { id, x, y, width, height } = data.payload;
+            setImageShapes((prev) =>
+              prev.map((img) =>
+                img.id === id ? { ...img, x, y, width, height } : img
+              )
+            );
+            break;
+          }
         }
       } catch (err) {
         console.error("Error al parsear mensaje WebSocket:", err);
@@ -1124,6 +1159,8 @@ export default function GridAdaptativo() {
               };
               reader.readAsDataURL(file);
             }
+
+            e.target.value = "";
           }}
 
         />
@@ -1405,8 +1442,46 @@ export default function GridAdaptativo() {
                           : s
                       )
                     );
+
+                    socket.send(
+                      JSON.stringify({
+                        type: "MOVE_BACKGROUND_IMAGE",
+                        payload: {
+                          id: shape.id,
+                          x: node.x(),
+                          y: node.y(),
+                          width: newWidth,
+                          height: newHeight,
+                        },
+                      })
+                    );
+                  }}
+                  onDragEnd={(e) => {
+                    const node = e.target;
+                    const newX = node.x();
+                    const newY = node.y();
+
+                    setImageShapes((prev) =>
+                      prev.map((s) =>
+                        s.id === shape.id ? { ...s, x: newX, y: newY } : s
+                      )
+                    );
+
+                    socket.send(
+                      JSON.stringify({
+                        type: "MOVE_BACKGROUND_IMAGE",
+                        payload: {
+                          id: shape.id,
+                          x: newX,
+                          y: newY,
+                          width: shape.width,
+                          height: shape.height,
+                        },
+                      })
+                    );
                   }}
                 />
+
               ))}
               <Transformer
                 ref={imageTransformerRef}
