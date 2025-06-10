@@ -951,6 +951,10 @@ export default function GridAdaptativo() {
             );
             break;
 
+          case "DELETE_TOKEN":
+            setTokens((prev) => prev.filter((t) => t.id !== data.payload.id));
+            break;
+
           case "ADD_AREA":
             setAreaShapes(prev => {
               if (prev.some(a => a.id === data.payload.id)) return prev;
@@ -1900,6 +1904,12 @@ export default function GridAdaptativo() {
                     setTokens(tokens => tokens.filter(t => t.id !== contextTokenId));
                     setContextTokenId(null);
                     setContextMenuVisible(false);
+
+                    socket.send(JSON.stringify({
+                      type: "DELETE_TOKEN",
+                      payload: { id: contextTokenId }
+                    }));
+
                   }}
                 >
                   Eliminar Token

@@ -43,12 +43,12 @@ let backgroundImages: {
 }[] = [];
 
 let imageShapes: Record<string, {
-  id: string;
-  src: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+    id: string;
+    src: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
 }> = {};
 
 
@@ -141,6 +141,19 @@ wss.on("connection", (ws) => {
                 tokens[id].y = y;
                 tokens[id].radius = radius;
             }
+        }
+
+        if (message.type === "DELETE_TOKEN") {
+            const { id } = message.payload;
+            delete tokens[id];
+
+            for (const client of clients) {
+                if (client !== ws && client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify(message));
+                }
+            }
+
+            return;
         }
 
         if (message.type === "ADD_AREA") {
