@@ -12,6 +12,12 @@ import { Icon } from "@iconify/react";
 
 export default function GridAdaptativo() {
 
+  //#region MODOS
+
+  const [isDmMode, setIsDmMode] = useState(false);
+
+  //#endregion
+
   //#region GRID
   const baseTileSize = 50; // Tamaño base de la casilla
 
@@ -57,6 +63,32 @@ export default function GridAdaptativo() {
 
     return lines;
   };
+
+  //#endregion
+
+  //#region FOG
+  const [foggedTiles, setFoggedTiles] = useState<Set<string>>(new Set());
+  const [isPlacingFog, setIsPlacingFog] = useState(false);
+  const [fogStart, setFogStart] = useState<{ x: number; y: number } | null>(null);
+  const [currentMousePos, setCurrentMousePos] = useState({ x: 0, y: 0 });
+  const [isCtrlDown, setIsCtrlDown] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey) setIsCtrlDown(true);
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (!e.ctrlKey) setIsCtrlDown(false);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, []);
 
   //#endregion
 
@@ -527,6 +559,12 @@ export default function GridAdaptativo() {
 
   // Manejo de eventos del mouse
   const handleMouseDown = (e: any) => {
+    if (isPlacingFog) {
+      const pos = e.target.getStage().getPointerPosition();
+      if (pos) setFogStart(pos);
+      return;
+    }
+
     //Utilizar la regla
     if (measureMode) {
       const mousePos = e.target.getStage().getPointerPosition();
@@ -766,7 +804,50 @@ export default function GridAdaptativo() {
   };
 
   //Finalizar eventos al soltar el cursor
-  const handleMouseUp = () => {
+  const handleMouseUp = (e: any) => {
+    if (isPlacingFog && fogStart) {
+      const pos = e.target.getStage().getPointerPosition();
+      if (!pos) return;
+
+      const x1 = Math.floor(fogStart.x / tileSize);
+      const y1 = Math.floor(fogStart.y / tileSize);
+      const x2 = Math.floor(pos.x / tileSize);
+      const y2 = Math.floor(pos.y / tileSize);
+
+      const xStart = Math.min(x1, x2);
+      const xEnd = Math.max(x1, x2);
+      const yStart = Math.min(y1, y2);
+      const yEnd = Math.max(y1, y2);
+
+      const affectedTiles = new Set<string>();
+      for (let x = xStart; x <= xEnd; x++) {
+        for (let y = yStart; y <= yEnd; y++) {
+          affectedTiles.add(`${x},${y}`);
+        }
+      }
+
+      const isRemovingFog = e.evt.ctrlKey; // ← aquí detectamos si Ctrl está presionado
+
+      setFoggedTiles((prev) => {
+        const updated = new Set(prev);
+        if (isRemovingFog) {
+          affectedTiles.forEach((key) => updated.delete(key));
+        } else {
+          affectedTiles.forEach((key) => updated.add(key));
+        }
+        return updated;
+      });
+
+      setFogStart(null);
+
+      socket.send(JSON.stringify({
+        type: isRemovingFog ? "FOG_REMOVE_TILES" : "FOG_ADD_TILES",
+        payload: Array.from(affectedTiles),
+      }));
+
+      return
+    }
+
     //Terminar de pintar los bordes de las casillas
     if (paintEdgesMode) {
       setIsDrawingEdge(false);
@@ -823,13 +904,14 @@ export default function GridAdaptativo() {
   const [moveMode, setMoveMode] = useState(false);
   const [isDraggingPlayer, setIsDraggingPlayer] = useState(false);
 
-  const setActiveTool = (tool: "paint" | "move" | "measure" | "laser" | "edges" | "circle" | "square" | "cone" | false) => {
+  const setActiveTool = (tool: "paint" | "move" | "measure" | "laser" | "edges" | "circle" | "square" | "cone" | "fog" | false) => {
     setPaintMode(tool === "paint");
     setMoveMode(tool === "move");
     setMeasureMode(tool === "measure");
     setLaserMode(tool === "laser");
     setPaintEdgesMode(tool === "edges");
     setAreaMode(tool === "circle" || tool === "square" || tool === "cone" ? tool : false);
+    setIsPlacingFog(tool === "fog");
   };
 
   //#endregion
@@ -899,7 +981,10 @@ export default function GridAdaptativo() {
 
             break;
           }
-
+          
+          case "INIT_FOG":
+            setFoggedTiles(new Set(data.payload));
+            break;
 
           case "PAINT_TILE":
             const { x, y, color } = data.payload;
@@ -926,6 +1011,22 @@ export default function GridAdaptativo() {
                 }
               }
               return newMap;
+            });
+            break;
+
+          case "FOG_ADD_TILES":
+            setFoggedTiles((prev) => {
+              const updated = new Set(prev);
+              data.payload.forEach((tile: string) => updated.add(tile));
+              return updated;
+            });
+            break;
+
+          case "FOG_REMOVE_TILES":
+            setFoggedTiles((prev) => {
+              const updated = new Set(prev);
+              data.payload.forEach((tile: string) => updated.delete(tile));
+              return updated;
             });
             break;
 
@@ -1091,175 +1192,203 @@ export default function GridAdaptativo() {
   }, []);
 
   //#endregion
+
+
+
   return (
     <div className="flex flex-col h-screen bg-content1">
       {/* Top Bar */}
-      <div className="flex flex-wrap items-center p-3 bg-content2 border-b border-default-200 gap-3 shadow-sm">
-        {/* Color Picker */}
-        <div className="flex items-center">
-          <ColorPalette
-            colors={paletteColors}
-            selectedColor={selectedColor}
-            onColorChange={setSelectedColor}
-            setColors={setPaletteColors}
-          />
-        </div>
+      {isDmMode && (
+        <>
+          <div className="flex flex-wrap items-center p-3 bg-content2 border-b border-default-200 gap-3 shadow-sm">
+            {/* Color Picker */}
+            <div className="flex items-center">
+              <ColorPalette
+                colors={paletteColors}
+                selectedColor={selectedColor}
+                onColorChange={setSelectedColor}
+                setColors={setPaletteColors}
+              />
+            </div>
 
-        <Divider orientation="vertical" className="h-8 mx-2" />
+            <Divider orientation="vertical" className="h-8 mx-2" />
 
-        {/* Audio Panel */}
-        <div className="flex items-center">
-          <AudioPanel />
-        </div>
+            {/* Audio Panel */}
+            <div className="flex items-center">
+              <AudioPanel />
+            </div>
 
-        <Divider orientation="vertical" className="h-8 mx-2" />
+            <Divider orientation="vertical" className="h-8 mx-2" />
 
-        {/* Hidden Image Upload */}
-        <input
-          type="file"
-          accept="image/*"
-          id="bg-upload"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) {
-              const reader = new FileReader();
-              reader.onload = () => {
-                const base64 = reader.result as string;
+            {/* Hidden Image Upload */}
+            <input
+              type="file"
+              accept="image/*"
+              id="bg-upload"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    const base64 = reader.result as string;
 
-                const img = new window.Image();
-                img.src = base64;
-                img.onload = () => {
-                  const id = crypto.randomUUID();
-                  const newImage = {
-                    id,
-                    x: gridWidth / 2 - img.width / 2,
-                    y: gridHeight / 2 - img.height / 2,
-                    width: img.width,
-                    height: img.height,
-                    image: img,
+                    const img = new window.Image();
+                    img.src = base64;
+                    img.onload = () => {
+                      const id = crypto.randomUUID();
+                      const newImage = {
+                        id,
+                        x: gridWidth / 2 - img.width / 2,
+                        y: gridHeight / 2 - img.height / 2,
+                        width: img.width,
+                        height: img.height,
+                        image: img,
+                      };
+
+                      // Mostrar en este cliente
+                      setImageShapes(prev => [...prev, newImage]);
+
+                      // Enviar a otros
+                      socket.send(JSON.stringify({
+                        type: "ADD_BACKGROUND_IMAGE",
+                        payload: {
+                          id,
+                          src: base64,
+                          x: newImage.x,
+                          y: newImage.y,
+                          width: newImage.width,
+                          height: newImage.height,
+                        },
+                      }));
+                    };
                   };
+                  reader.readAsDataURL(file);
+                }
 
-                  // Mostrar en este cliente
-                  setImageShapes(prev => [...prev, newImage]);
+                e.target.value = "";
+              }}
 
-                  // Enviar a otros
+            />
+
+
+            {/* Background Button */}
+            <Tooltip content="Upload background image">
+              <Button
+                color="default"
+                variant="flat"
+                startContent={<Icon icon="lucide:image" />}
+                onClick={() => document.getElementById("bg-upload")?.click()}
+              >
+                Background
+              </Button>
+            </Tooltip>
+
+            <Tooltip content="Remove background image">
+              <Button
+                color="danger"
+                variant="flat"
+                startContent={<Icon icon="lucide:trash" />}
+                onClick={() => {
+                  if (!selectedImageId) return;
+
+                  // Eliminar localmente
+                  setImageShapes(prev => prev.filter(img => img.id !== selectedImageId));
+                  setSelectedImageId(null);
+
+                  // Enviar al servidor
                   socket.send(JSON.stringify({
-                    type: "ADD_BACKGROUND_IMAGE",
-                    payload: {
-                      id,
-                      src: base64,
-                      x: newImage.x,
-                      y: newImage.y,
-                      width: newImage.width,
-                      height: newImage.height,
-                    },
+                    type: "DELETE_BACKGROUND_IMAGE",
+                    payload: { id: selectedImageId },
                   }));
-                };
-              };
-              reader.readAsDataURL(file);
-            }
+                }}
+              >
+                Remove Background
+              </Button>
+            </Tooltip>
 
-            e.target.value = "";
-          }}
+            <Tooltip content="Clear background image">
+              <Button
+                color="default"
+                variant="flat"
+                startContent={<Icon icon="lucide:trash" />}
+                onClick={() => {
+                  setImageShapes([]);
+                  setSelectedImageId(null);
 
-        />
+                  socket.send(JSON.stringify({
+                    type: "CLEAR_BACKGROUND_IMAGES",
+                  }));
 
+                }}
+              >
+                Clear Background
+              </Button>
+            </Tooltip>
 
-        {/* Background Button */}
-        <Tooltip content="Upload background image">
-          <Button
-            color="default"
-            variant="flat"
-            startContent={<Icon icon="lucide:image" />}
-            onClick={() => document.getElementById("bg-upload")?.click()}
-          >
-            Background
-          </Button>
-        </Tooltip>
+            {/* Spacer + Add Token */}
+            <div className="ml-auto">
+              <Button
+                color="success"
+                startContent={<Icon icon="lucide:plus-circle" />}
+                onClick={addNewToken}
+                className="font-medium"
+              >
+                Add Token
+              </Button>
+            </div>
 
-        <Tooltip content="Remove background image">
-          <Button
-            color="danger"
-            variant="flat"
-            startContent={<Icon icon="lucide:trash" />}
-            onClick={() => {
-              if (!selectedImageId) return;
+          </div>
+        </>
+      )}
 
-              // Eliminar localmente
-              setImageShapes(prev => prev.filter(img => img.id !== selectedImageId));
-              setSelectedImageId(null);
-
-              // Enviar al servidor
-              socket.send(JSON.stringify({
-                type: "DELETE_BACKGROUND_IMAGE",
-                payload: { id: selectedImageId },
-              }));
-            }}
-          >
-            Remove Background
-          </Button>
-        </Tooltip>
-
-        <Tooltip content="Clear background image">
-          <Button
-            color="default"
-            variant="flat"
-            startContent={<Icon icon="lucide:trash" />}
-            onClick={() => {
-              setImageShapes([]);
-              setSelectedImageId(null);
-
-              socket.send(JSON.stringify({
-                type: "CLEAR_BACKGROUND_IMAGES",
-              }));
-
-            }}
-          >
-            Clear Background
-          </Button>
-        </Tooltip>
-
-        {/* Spacer + Add Token */}
-        <div className="ml-auto">
-          <Button
-            color="success"
-            startContent={<Icon icon="lucide:plus-circle" />}
-            onClick={addNewToken}
-            className="font-medium"
-          >
-            Add Token
-          </Button>
-        </div>
-      </div>
 
       {/* Tool Buttons Row - Moved from sides to top */}
       <div className="flex justify-between items-center p-2 bg-content1 border-b border-default-200">
         {/* Left Tool Buttons - Now at top */}
         <div className="flex">
           <ButtonGroup className="shadow-sm rounded-lg overflow-hidden">
-            <Tooltip content="Paint tiles" placement="bottom">
-              <Button
-                color={paintMode ? "primary" : "default"}
-                onClick={() => setActiveTool("paint")}
-                startContent={<Icon icon="lucide:paintbrush" width={20} />}
-                className="px-3 py-2"
-                size="sm"
-              >
-                Paint
-              </Button>
-            </Tooltip>
-            <Tooltip content="Paint edges" placement="bottom">
-              <Button
-                color={paintEdgesMode ? "primary" : "default"}
-                onClick={() => setActiveTool("edges")}
-                startContent={<Icon icon="lucide:square" width={20} />}
-                className="px-3 py-2"
-                size="sm"
-              >
-                Edges
-              </Button>
-            </Tooltip>
+            {isDmMode && (
+              <Tooltip content="Paint tiles" placement="bottom">
+                <Button
+                  color={paintMode ? "primary" : "default"}
+                  onClick={() => setActiveTool("paint")}
+                  startContent={<Icon icon="lucide:paintbrush" width={20} />}
+                  className="px-3 py-2"
+                  size="sm"
+                >
+                  Paint
+                </Button>
+              </Tooltip>
+            )}
+
+            {isDmMode && (
+              <Tooltip content="Paint tiles" placement="bottom">
+                <Button
+                  onClick={() => setActiveTool("fog")}
+                  color={isPlacingFog ? "primary" : "default"}
+                  startContent={<Icon icon="lucide:cloud-fog" width={20} />}
+                  className="px-3 py-2"
+                  size="sm"
+                >
+                  {isCtrlDown ? "🟥 Revelando niebla" : "⬛ Colocando niebla"}
+                </Button>
+              </Tooltip>
+            )}
+
+            {isDmMode && (
+              <Tooltip content="Paint edges" placement="bottom">
+                <Button
+                  color={paintEdgesMode ? "primary" : "default"}
+                  onClick={() => setActiveTool("edges")}
+                  startContent={<Icon icon="lucide:square" width={20} />}
+                  className="px-3 py-2"
+                  size="sm"
+                >
+                  Edges
+                </Button>
+              </Tooltip>
+            )}
             <Tooltip content="Move tokens" placement="bottom">
               <Button
                 color={moveMode ? "primary" : "default"}
@@ -1329,6 +1458,14 @@ export default function GridAdaptativo() {
               </PopoverContent>
             </Popover>
           </ButtonGroup>
+
+          <Button
+            color={isDmMode ? "primary" : "default"}
+            variant="flat"
+            onClick={() => setIsDmMode(prev => !prev)}
+          >
+            {isDmMode ? "Leave DM mode" : "Join as DM"}
+          </Button>
         </div>
 
         {/* Right Tool Buttons - Now at top */}
@@ -1381,16 +1518,46 @@ export default function GridAdaptativo() {
             height={gridHeight}
             onMouseDown={(e) => {
               handleMouseDown(e);
-              handleClickStage(e); // 👈 para no interrumpir otras lógicas
+              handleClickStage(e);
+              if (!isPlacingFog) return;
+              const pos = e.target.getStage()?.getPointerPosition();
+              if (pos) setFogStart(pos);
             }}
             onMouseMove={(e) => {
               handleMouseMove(e);
               handleMouseMovePlayer(e);
+              if (!isPlacingFog) return;
+              const pos = e.target.getStage()?.getPointerPosition();
+              if (pos) setCurrentMousePos(pos);
             }}
-            onMouseUp={() => {
-              handleMouseUp();
+            onMouseUp={(e) => {
+              handleMouseUp(e);
               setIsDraggingPlayer(false);
               setDragOffsets({});
+              if (!isPlacingFog || !fogStart || !currentMousePos) return;
+
+              const tileSize = 32;
+
+              const x1 = Math.floor(fogStart.x / tileSize);
+              const y1 = Math.floor(fogStart.y / tileSize);
+              const x2 = Math.floor(currentMousePos.x / tileSize);
+              const y2 = Math.floor(currentMousePos.y / tileSize);
+
+              const xStart = Math.min(x1, x2);
+              const xEnd = Math.max(x1, x2);
+              const yStart = Math.min(y1, y2);
+              const yEnd = Math.max(y1, y2);
+
+              const affectedTiles: string[] = [];
+              for (let x = xStart; x <= xEnd; x++) {
+                for (let y = yStart; y <= yEnd; y++) {
+                  affectedTiles.push(`${x},${y}`);
+                }
+              }
+
+              console.log("Tiles a ocultar:", affectedTiles);
+              setFogStart(null);
+              //setCurrentMousePos(null);
             }}
             style={{
               backgroundImage: backgroundImage ? `url(${backgroundImage.src})` : "none",
@@ -1505,6 +1672,10 @@ export default function GridAdaptativo() {
               {/* Casillas pintadas con color */}
               {[...paintedTiles.entries()].map(([key, color]) => {
                 const [x, y] = key.split(",").map(Number);
+
+                // No pintar si está bajo niebla (solo para jugadores)
+                if (!isDmMode && foggedTiles.has(`${x},${y}`)) return null;
+
                 return (
                   <Rect
                     key={key}
@@ -1650,6 +1821,7 @@ export default function GridAdaptativo() {
                         }
                       }}
                       onContextMenu={(e) => {
+                        if (!isDmMode) return;
                         e.evt.preventDefault();
                         setContextTokenId(token.id);
                         setContextMenuPosition({ x: e.evt.clientX, y: e.evt.clientY });
@@ -1706,6 +1878,7 @@ export default function GridAdaptativo() {
                         }
                       }}
                       onContextMenu={(e) => {
+                        if (!isDmMode) return;
                         e.evt.preventDefault();
                         setContextTokenId(token.id);
                         setContextMenuPosition({ x: e.evt.clientX, y: e.evt.clientY });
@@ -1874,6 +2047,37 @@ export default function GridAdaptativo() {
                   shadowOpacity={0.6}
                 />
               )}
+
+              {isPlacingFog && fogStart && currentMousePos && (
+                <Rect
+                  x={Math.min(fogStart.x, currentMousePos.x)}
+                  y={Math.min(fogStart.y, currentMousePos.y)}
+                  width={Math.abs(currentMousePos.x - fogStart.x)}
+                  height={Math.abs(currentMousePos.y - fogStart.y)}
+                  fill="black"
+                  opacity={0.2}
+                  listening={false}
+                  dash={[4, 4]}
+                />
+              )}
+
+              {isDmMode &&
+                [...foggedTiles].map((key) => {
+                  const [x, y] = key.split(",").map(Number);
+                  return (
+                    <Rect
+                      key={`fog-preview-${key}`}
+                      x={x * tileSize}
+                      y={y * tileSize}
+                      width={tileSize}
+                      height={tileSize}
+                      fill="black"
+                      opacity={0.25}
+                      listening={false}
+                      dash={[4, 4]}
+                    />
+                  );
+                })}
             </Layer>
           </Stage>
 

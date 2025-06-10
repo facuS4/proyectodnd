@@ -28,6 +28,7 @@ let areas: Record<string, {
     rotation?: number;
 }> = {};
 let currentMeasurement: { start: { x: number, y: number }, end: { x: number, y: number } } | null = null;
+let foggedTiles: Set<string> = new Set();
 
 // Estado del Laser 
 let laserColors: Record<string, string> = {};
@@ -72,6 +73,13 @@ wss.on("connection", (ws) => {
         JSON.stringify({
             type: "INIT_EDGES",
             payload: paintedEdges,
+        })
+    );
+
+    ws.send(
+        JSON.stringify({
+            type: "INIT_FOG",
+            payload: Array.from(foggedTiles), // asegúrate que sea un array
         })
     );
 
@@ -286,6 +294,32 @@ wss.on("connection", (ws) => {
                 }
             }
 
+            return;
+        }
+
+        if (message.type === "FOG_ADD_TILES") {
+            if (Array.isArray(message.payload)) {
+                message.payload.forEach((tile: string) => foggedTiles.add(tile));
+            }
+
+            for (const client of clients) {
+                if (client !== ws && client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify(message));
+                }
+            }
+            return;
+        }
+
+        if (message.type === "FOG_REMOVE_TILES") {
+            if (Array.isArray(message.payload)) {
+                message.payload.forEach((tile: string) => foggedTiles.delete(tile));
+            }
+
+            for (const client of clients) {
+                if (client !== ws && client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify(message));
+                }
+            }
             return;
         }
 
