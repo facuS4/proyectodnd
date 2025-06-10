@@ -1956,6 +1956,7 @@ export default function GridAdaptativo() {
                 <p><span className="font-medium">Shift + Click/Drag:</span> Select multiple tokens</p>
                 <p><span className="font-medium">R:</span> Increase token size</p>
                 <p><span className="font-medium">F:</span> Decrease token size</p>
+                <p><span className="font-medium">Right Click:</span> Delete Square, Cone and Circle</p>
               </div>
             </div>
           </PopoverContent>
