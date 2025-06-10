@@ -981,7 +981,7 @@ export default function GridAdaptativo() {
 
             break;
           }
-          
+
           case "INIT_FOG":
             setFoggedTiles(new Set(data.payload));
             break;
@@ -1184,6 +1184,19 @@ export default function GridAdaptativo() {
             );
             break;
           }
+
+          case "TOKEN_IMAGE":
+            const { id, base64 } = data.payload;
+            const img = new window.Image();
+            img.src = base64;
+            img.onload = () => {
+              setTokens((tokens) =>
+                tokens.map((t) =>
+                  t.id === id ? { ...t, image: img } : t
+                )
+              );
+            };
+            break;
         }
       } catch (err) {
         console.error("Error al parsear mensaje WebSocket:", err);
@@ -2159,15 +2172,33 @@ export default function GridAdaptativo() {
                       const file = e.target.files?.[0];
                       if (!file || !contextTokenId) return;
 
-                      const img = new window.Image();
-                      img.src = URL.createObjectURL(file);
-                      img.onload = () => {
-                        setTokens((tokens) =>
-                          tokens.map((t) =>
-                            t.id === contextTokenId ? { ...t, image: img } : t
-                          )
-                        );
+                      const reader = new FileReader();
+
+                      reader.onload = () => {
+                        const base64 = reader.result as string;
+
+                        const img = new window.Image();
+                        img.src = base64;
+                        img.onload = () => {
+                          // 🧠 1. Mostrar localmente
+                          setTokens((tokens) =>
+                            tokens.map((t) =>
+                              t.id === contextTokenId ? { ...t, image: img } : t
+                            )
+                          );
+
+                          // 📡 2. Enviar al servidor
+                          socket.send(JSON.stringify({
+                            type: "TOKEN_IMAGE",
+                            payload: {
+                              id: contextTokenId,
+                              base64
+                            }
+                          }));
+                        };
                       };
+
+                      reader.readAsDataURL(file);
                     }}
                   />
                 </div>

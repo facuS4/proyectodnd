@@ -17,7 +17,9 @@ let tokens: Record<string, {
     color: string;
     nombre: string;
     vida: string;
+    imageBase64?: string; // <-- ✅ permitido
 }> = {};
+
 let paintedEdges: Record<string, string> = {};
 let areas: Record<string, {
     id: string;
@@ -322,6 +324,14 @@ wss.on("connection", (ws) => {
             }
             return;
         }
+
+        if (message.type === "TOKEN_IMAGE") {
+            const { id, base64 } = message.payload;
+            if (tokens[id]) {
+                tokens[id].imageBase64 = base64;
+            }
+        }
+
 
         // Broadcast
         for (const client of clients) {
