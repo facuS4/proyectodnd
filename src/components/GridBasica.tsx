@@ -77,6 +77,17 @@ export default function GridAdaptativo() {
     return lines;
   };
 
+  const getWorldPos = () => {
+    const stage = stageRef.current;
+    const pointer = stage?.getPointerPosition();
+    const scale = stage?.scaleX() ?? 1;
+    const pos = {
+      x: (pointer?.x - stage.x()) / scale,
+      y: (pointer?.y - stage.y()) / scale,
+    };
+    return pos;
+  };
+
   //#endregion
 
   //#region FOG
@@ -85,6 +96,7 @@ export default function GridAdaptativo() {
   const [fogStart, setFogStart] = useState<{ x: number; y: number } | null>(null);
   const [currentMousePos, setCurrentMousePos] = useState({ x: 0, y: 0 });
   const [isCtrlDown, setIsCtrlDown] = useState(false);
+  const [hasStartedFogDraw, setHasStartedFogDraw] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -509,6 +521,8 @@ export default function GridAdaptativo() {
   //AREAS
   const transformerRef = useRef<any>(null);
   const shapeRefs = useRef<Map<string, any>>(new Map());
+  const [isDraggingNode, setIsDraggingNode] = useState(false);
+  const [clickedOnInteractiveNode, setClickedOnInteractiveNode] = useState(false);
 
   type AreaShape = {
     id: string;
@@ -641,38 +655,41 @@ export default function GridAdaptativo() {
   // Manejo de eventos del mouse
   const handleMouseDown = (e: any) => {
     if (isPlacingFog) {
-      const pos = e.target.getStage().getPointerPosition();
-      if (pos) setFogStart(pos);
-      return;
+      requestAnimationFrame(() => {
+        const world = getWorldPos();
+        setFogStart(world);
+        setHasStartedFogDraw(false);
+      });
     }
 
     //Utilizar la regla
     if (measureMode) {
-      const mousePos = e.target.getStage().getPointerPosition();
-      if (mousePos) {
-        const x = Math.floor(mousePos.x / tileSize);
-        const y = Math.floor(mousePos.y / tileSize);
-        setMeasureStart({ x, y });
-        setMeasureEnd({ x, y });
+      const { x: worldX, y: worldY } = getWorldPos();
+      const x = Math.floor(worldX / tileSize);
+      const y = Math.floor(worldY / tileSize);
+      setMeasureStart({ x, y });
+      setMeasureEnd({ x, y });
 
-        socket.send(JSON.stringify({
-          type: "MEASURE",
-          payload: {
-            start: { x, y },
-            end: { x, y },
-          }
-        }));
-      }
+      socket.send(JSON.stringify({
+        type: "MEASURE",
+        payload: {
+          start: { x, y },
+          end: { x, y },
+        },
+      }));
+
       return;
     }
 
     //Area para seleccionar multiples tokens
-    if (areaMode) {
-      const mousePos = e.target.getStage().getPointerPosition();
-      if (!mousePos) return;
+    const world = getWorldPos();
+    if (!world) return;
 
-      const snapped = snapToGrid(mousePos.x, mousePos.y, tileSize);
+    // Colocar nueva área
+    if (areaMode) {
+      const snapped = snapToGrid(world.x, world.y, tileSize);
       const id = crypto.randomUUID();
+
       const baseShape: AreaShape = {
         id,
         x: snapped.x,
@@ -694,25 +711,18 @@ export default function GridAdaptativo() {
       return;
     }
 
-    const mousePos = e.target.getStage().getPointerPosition();
-    if (!mousePos) return;
-    const x = Math.floor(mousePos.x / tileSize);
-    const y = Math.floor(mousePos.y / tileSize);
-
     // Iniciar selección múltiple si estamos en moveMode y Shift está presionado
     if (moveMode && isShiftDown) {
-      setSelectionStart({ x: mousePos.x, y: mousePos.y });
-      setSelectionRect({ x: mousePos.x, y: mousePos.y, width: 0, height: 0 });
+      setSelectionStart({ x: world.x, y: world.y });
+      setSelectionRect({ x: world.x, y: world.y, width: 0, height: 0 });
       return;
     }
 
-    //Pintar bordes de las celdas
+    // Pintar bordes de las celdas
     if (paintEdgesMode) {
-      const mousePos = e.target.getStage().getPointerPosition();
-      if (!mousePos) return;
-
-      const x = Math.floor(mousePos.x / tileSize);
-      const y = Math.floor(mousePos.y / tileSize);
+      const { x: worldX, y: worldY } = getWorldPos();
+      const x = Math.floor(worldX / tileSize);
+      const y = Math.floor(worldY / tileSize);
 
       if (isShiftDown) {
         setRectEdgePaintStart({ x, y });
@@ -720,8 +730,8 @@ export default function GridAdaptativo() {
         return;
       }
 
-      const localX = mousePos.x % tileSize;
-      const localY = mousePos.y % tileSize;
+      const localX = worldX % tileSize;
+      const localY = worldY % tileSize;
 
       const margin = 6;
       let edge = null;
@@ -742,6 +752,14 @@ export default function GridAdaptativo() {
           }
           return newMap;
         });
+
+        // Enviar al servidor también si corresponde
+        socket.send(JSON.stringify({
+          type: "PAINT_EDGE",
+          payload: {
+            updates: [{ key, color: selectedColor }],
+          },
+        }));
       }
 
       setIsDrawingEdge(true);
@@ -751,10 +769,13 @@ export default function GridAdaptativo() {
     //Pintar si estamos en paintMode
     if (paintMode) {
       setIsDrawing(true);
+      const { x, y } = getWorldPos();
+      const gridX = Math.floor(x / tileSize);
+      const gridY = Math.floor(y / tileSize);
       if (isShiftDown) {
-        setRectPaintStart({ x, y });
+        setRectPaintStart({ x: gridX, y: gridY });
       } else {
-        paintTile(x, y);
+        paintTile(gridX, gridY);
       }
       return;
     }
@@ -762,36 +783,38 @@ export default function GridAdaptativo() {
 
   //Eventos al mover el cursor
   const handleMouseMove = (e: any) => {
+    if (isPlacingFog && fogStart && !hasStartedFogDraw) {
+      setHasStartedFogDraw(true);
+    }
+
     //Utilizar el laser
     if (laserMode) {
-      const pos = e.target.getStage()?.getPointerPosition();
-      if (pos) {
-        const now = Date.now();
-        const point = { x: pos.x, y: pos.y, time: now };
-        setLaserPath((prev) => [...prev, point]);
+      const pos = getWorldPos();
+      const now = Date.now();
+      const point = { x: pos.x, y: pos.y, time: now };
 
-        socket.send(JSON.stringify({
-          type: "LASER_PATH",
-          payload: {
-            userId: myId,
-            color: laserColor,  // <-- así mandás el color actual
-            path: laserPath,
-          },
-        }));
+      setLaserPath((prev) => [...prev, point]);
 
-      }
+      socket.send(JSON.stringify({
+        type: "LASER_PATH",
+        payload: {
+          userId: myId,
+          color: laserColor,
+          path: [...laserPath, point], // también podrías enviar solo el nuevo punto
+        },
+      }));
+
       return;
     }
 
 
 
-    //Pintar los bordes de las celdas
+    // Pintar los bordes de las celdas
     if (paintEdgesMode && isDrawingEdge) {
-      const mousePos = e.target.getStage().getPointerPosition();
-      if (!mousePos) return;
+      const { x: worldX, y: worldY } = getWorldPos();
 
-      const x = Math.floor(mousePos.x / tileSize);
-      const y = Math.floor(mousePos.y / tileSize);
+      const x = Math.floor(worldX / tileSize);
+      const y = Math.floor(worldY / tileSize);
 
       if (isShiftDown && rectEdgePaintStart) {
         // 🟦 Shift + arrastre => pintar bordes del rectángulo
@@ -811,8 +834,8 @@ export default function GridAdaptativo() {
         }
       } else {
         // 🖱️ Pintado normal con el mouse sobre un borde
-        const localX = mousePos.x % tileSize;
-        const localY = mousePos.y % tileSize;
+        const localX = worldX % tileSize;
+        const localY = worldY % tileSize;
 
         const margin = 6;
         let edge = null;
@@ -845,20 +868,18 @@ export default function GridAdaptativo() {
 
     //Mover la regla
     if (measureMode && measureStart) {
-      const mousePos = e.target.getStage().getPointerPosition();
-      if (mousePos) {
-        const x = Math.floor(mousePos.x / tileSize);
-        const y = Math.floor(mousePos.y / tileSize);
-        setMeasureEnd({ x, y });
+      const { x: worldX, y: worldY } = getWorldPos();
+      const x = Math.floor(worldX / tileSize);
+      const y = Math.floor(worldY / tileSize);
+      setMeasureEnd({ x, y });
 
-        socket.send(JSON.stringify({
-          type: "MEASURE",
-          payload: {
-            start: measureStart,
-            end: { x, y },
-          }
-        }));
-      }
+      socket.send(JSON.stringify({
+        type: "MEASURE",
+        payload: {
+          start: measureStart,
+          end: { x, y },
+        },
+      }));
     }
 
     if (!paintMode) return;
@@ -867,8 +888,10 @@ export default function GridAdaptativo() {
     if (!mousePos) return;
 
     //Pintar multiples casillas 
-    const x = Math.floor(mousePos.x / tileSize);
-    const y = Math.floor(mousePos.y / tileSize);
+    const { x: worldX, y: worldY } = getWorldPos();
+    const x = Math.floor(worldX / tileSize);
+    const y = Math.floor(worldY / tileSize);
+
     if (isShiftDown && rectPaintStart) {
       const x1 = Math.min(rectPaintStart.x, x);
       const x2 = Math.max(rectPaintStart.x, x);
@@ -887,13 +910,12 @@ export default function GridAdaptativo() {
   //Finalizar eventos al soltar el cursor
   const handleMouseUp = (e: any) => {
     if (isPlacingFog && fogStart) {
-      const pos = e.target.getStage().getPointerPosition();
-      if (!pos) return;
+      const { x: worldX, y: worldY } = getWorldPos();
 
       const x1 = Math.floor(fogStart.x / tileSize);
       const y1 = Math.floor(fogStart.y / tileSize);
-      const x2 = Math.floor(pos.x / tileSize);
-      const y2 = Math.floor(pos.y / tileSize);
+      const x2 = Math.floor(worldX / tileSize);
+      const y2 = Math.floor(worldY / tileSize);
 
       const xStart = Math.min(x1, x2);
       const xEnd = Math.max(x1, x2);
@@ -1671,10 +1693,11 @@ export default function GridAdaptativo() {
               stage.batchDraw();
             }}
             onDragStart={(e) => {
-              // 🛑 Solo permitimos drag si el botón del medio está presionado
-              if (e.evt.button !== 1) {
-                e.cancelBubble = true;
-                e.target.stopDrag();
+              if (e.target === stageRef.current) {
+                if (e.evt.button !== 1) {
+                  e.cancelBubble = true;
+                  e.target.stopDrag();
+                }
               }
             }}
             onDragEnd={(e) => {
@@ -1682,12 +1705,20 @@ export default function GridAdaptativo() {
               setStagePosition(pos);
             }}
             onMouseDown={(e) => {
-              if (e.evt.button === 1) {
+              const className = e.target.getClassName?.();
+              const isNonInteractiveBackground =
+                className === "Stage" || className === "Rect" || className === "Line";
+
+              if (e.evt.button === 1 && isNonInteractiveBackground) {
                 setIsPanning(true);
-              } else {
-                handleMouseDown(e);
-                handleClickStage(e);
-                if (!isPlacingFog) return;
+              }
+
+              if (!isNonInteractiveBackground) return;
+
+              handleMouseDown(e);
+              handleClickStage(e);
+
+              if (isPlacingFog) {
                 const pos = e.target.getStage()?.getPointerPosition();
                 if (pos) setFogStart(pos);
               }
@@ -1704,16 +1735,20 @@ export default function GridAdaptativo() {
                 stage.position(newPos);
                 setStagePosition(newPos);
                 stage.batchDraw();
-              } else {
-                handleMouseMove(e);
-                handleMouseMovePlayer(e);
-                if (!isPlacingFog) return;
+                return;
+              }
+
+              handleMouseMove(e);
+              handleMouseMovePlayer(e);
+
+              if (isPlacingFog) {
                 const pos = e.target.getStage()?.getPointerPosition();
                 if (pos) setCurrentMousePos(pos);
               }
             }}
             onMouseUp={(e) => {
               setIsPanning(false);
+              setIsDraggingNode(false);
               handleMouseUp(e);
               setIsDraggingPlayer(false);
               setDragOffsets({});
@@ -1770,44 +1805,15 @@ export default function GridAdaptativo() {
                   stroke="black"
                   strokeWidth={selectedImageId === shape.id ? 2 : 0}
                   draggable
-                  ref={(node) => {
-                    if (node) imageShapeRefs.current.set(shape.id, node);
-                    else imageShapeRefs.current.delete(shape.id);
-                  }}
                   onClick={() => setSelectedImageId(shape.id)}
-                  onTransformEnd={(e) => {
-                    const node = e.target;
-                    const scaleX = node.scaleX();
-                    const scaleY = node.scaleY();
-
-                    node.scaleX(1);
-                    node.scaleY(1);
-
-                    const newWidth = shape.width * scaleX;
-                    const newHeight = shape.height * scaleY;
-
-                    setImageShapes((prev) =>
-                      prev.map((s) =>
-                        s.id === shape.id
-                          ? { ...s, x: node.x(), y: node.y(), width: newWidth, height: newHeight }
-                          : s
-                      )
-                    );
-
-                    socket.send(
-                      JSON.stringify({
-                        type: "MOVE_BACKGROUND_IMAGE",
-                        payload: {
-                          id: shape.id,
-                          x: node.x(),
-                          y: node.y(),
-                          width: newWidth,
-                          height: newHeight,
-                        },
-                      })
-                    );
+                  onDragStart={() => {
+                    setIsDraggingNode(true);
+                  }}
+                  onDragMove={(e) => {
+                    e.cancelBubble = true; // esto evita pan del Stage
                   }}
                   onDragEnd={(e) => {
+                    setIsDraggingNode(false);
                     const node = e.target;
                     const newX = node.x();
                     const newY = node.y();
@@ -1833,7 +1839,9 @@ export default function GridAdaptativo() {
                   }}
                 />
 
+
               ))}
+
               <Transformer
                 ref={imageTransformerRef}
                 enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
@@ -1968,19 +1976,19 @@ export default function GridAdaptativo() {
                     />
                   ) : (
                     <>
-                    {/* Mostrar vida localmente si sos dm */}
-                    {isDmMode && (
-                      <Text
-                        x={token.x - token.radius}
-                        y={token.y - token.radius - 18}
-                        width={token.radius * 2}
-                        align="center"
-                        text={token.vida}
-                        fontSize={12}
-                        fill="black"
-                        fontStyle="bold"
-                      />
-                    )}
+                      {/* Mostrar vida localmente si sos dm */}
+                      {isDmMode && (
+                        <Text
+                          x={token.x - token.radius}
+                          y={token.y - token.radius - 18}
+                          width={token.radius * 2}
+                          align="center"
+                          text={token.vida}
+                          fontSize={12}
+                          fill="black"
+                          fontStyle="bold"
+                        />
+                      )}
                       <Text
                         x={token.x - token.radius}
                         y={token.y + token.radius + 2}
@@ -2114,21 +2122,25 @@ export default function GridAdaptativo() {
                   onClick: () => setSelectedAreaId(shape.id),
                   onTap: () => setSelectedAreaId(shape.id),
                   onDragEnd: (e: any) => {
-                    const { x, y } = e.target.position();
+                    const node = e.target;
+                    const offsetX = node.offsetX();
+                    const offsetY = node.offsetY();
+
+                    const newX = node.x() + offsetX;
+                    const newY = node.y() + offsetY;
 
                     setAreaShapes(prev =>
                       prev.map(s =>
-                        s.id === shape.id ? { ...s, x, y } : s
+                        s.id === shape.id ? { ...s, x: newX, y: newY } : s
                       )
                     );
 
-                    // 🔴 Enviar al servidor
                     socket.send(JSON.stringify({
                       type: "MOVE_AREA",
                       payload: {
                         id: shape.id,
-                        x,
-                        y
+                        x: newX,
+                        y: newY
                       }
                     }));
                   },
@@ -2174,7 +2186,7 @@ export default function GridAdaptativo() {
                 };
 
                 if (shape.type === "circle") {
-                  return <Circle key={shape.id} {...commonProps} radius={shape.size / 2} />;
+                  return <Circle key={shape.id} {...commonProps} radius={shape.size / 2} onDragStart={() => setIsDraggingNode(true)} onDragMove={(e) => { e.cancelBubble = true; }} onDragEnd={() => setIsDraggingNode(false)} />;
                 }
 
                 if (shape.type === "square") {
@@ -2186,6 +2198,11 @@ export default function GridAdaptativo() {
                       height={shape.size}
                       offsetX={shape.size / 2}
                       offsetY={shape.size / 2}
+                      onDragStart={() => setIsDraggingNode(true)}
+                      onDragMove={(e) => {
+                        e.cancelBubble = true;
+                      }}
+                      onDragEnd={() => setIsDraggingNode(false)}
                     />
                   );
                 }
@@ -2205,6 +2222,11 @@ export default function GridAdaptativo() {
                       offsetX={0}
                       offsetY={0}
                       rotation={shape.rotation || 0}
+                      onDragStart={() => setIsDraggingNode(true)}
+                      onDragMove={(e) => {
+                        e.cancelBubble = true;
+                      }}
+                      onDragEnd={() => setIsDraggingNode(false)}
                     />
                   );
                 }
@@ -2248,18 +2270,20 @@ export default function GridAdaptativo() {
                 />
               )}
 
-              {isPlacingFog && fogStart && currentMousePos && (
-                <Rect
-                  x={Math.min(fogStart.x, currentMousePos.x)}
-                  y={Math.min(fogStart.y, currentMousePos.y)}
-                  width={Math.abs(currentMousePos.x - fogStart.x)}
-                  height={Math.abs(currentMousePos.y - fogStart.y)}
-                  fill="black"
-                  opacity={0.2}
-                  listening={false}
-                  dash={[4, 4]}
-                />
-              )}
+              {isPlacingFog && fogStart && hasStartedFogDraw && (() => {
+                const { x, y } = getWorldPos();
+                return (
+                  <Rect
+                    x={Math.min(fogStart.x, x)}
+                    y={Math.min(fogStart.y, y)}
+                    width={Math.abs(x - fogStart.x)}
+                    height={Math.abs(y - fogStart.y)}
+                    fill="gray"
+                    opacity={0.3}
+                    listening={false}
+                  />
+                );
+              })()}
 
               {isDmMode &&
                 [...foggedTiles].map((key) => {
@@ -2278,6 +2302,10 @@ export default function GridAdaptativo() {
                     />
                   );
                 })}
+            </Layer>
+
+            <Layer >
+
             </Layer>
           </Stage>
 
