@@ -2366,6 +2366,7 @@ export default function GridAdaptativo() {
                 <p><span className="font-medium">R:</span> Increase token size</p>
                 <p><span className="font-medium">F:</span> Decrease token size</p>
                 <p><span className="font-medium">Right Click:</span> Delete Square, Cone and Circle</p>
+                <p><span className="font-medium">X:</span> Mark Selected Token As Dead</p>
               </div>
             </div>
           </PopoverContent>
