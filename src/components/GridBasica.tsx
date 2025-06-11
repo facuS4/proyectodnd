@@ -20,6 +20,9 @@ export default function GridAdaptativo() {
 
   //#region GRID
   const baseTileSize = 50; // Tamaño base de la casilla
+  const [stagePosition, setStagePosition] = useState({ x: 0, y: 0 });
+  const stageRef = useRef<any>(null);
+  const [isPanning, setIsPanning] = useState(false);
 
   const gridWidth = 2000; // Ancho del grid
   const gridHeight = 1000; // Alto del grid
@@ -39,22 +42,31 @@ export default function GridAdaptativo() {
   const drawGrid = () => {
     const lines = [];
 
-    for (let i = 0; i <= numCols; i++) {
+    const padding = 5; // cantidad de tiles extra para renderizar fuera de pantalla
+    const viewWidth = window.innerWidth;
+    const viewHeight = window.innerHeight;
+
+    const startX = Math.floor(-stagePosition.x / tileSize) - padding;
+    const endX = Math.floor((-stagePosition.x + viewWidth) / tileSize) + padding;
+    const startY = Math.floor(-stagePosition.y / tileSize) - padding;
+    const endY = Math.floor((-stagePosition.y + viewHeight) / tileSize) + padding;
+
+    for (let i = startX; i <= endX; i++) {
       lines.push(
         <Line
           key={`v-${i}`}
-          points={[i * tileSize, 0, i * tileSize, numRows * tileSize]}
+          points={[i * tileSize, startY * tileSize, i * tileSize, endY * tileSize]}
           stroke="rgba(128, 128, 128, 0.5)"
           strokeWidth={0.5}
         />
       );
     }
 
-    for (let i = 0; i <= numRows; i++) {
+    for (let i = startY; i <= endY; i++) {
       lines.push(
         <Line
           key={`h-${i}`}
-          points={[0, i * tileSize, numCols * tileSize, i * tileSize]}
+          points={[startX * tileSize, i * tileSize, endX * tileSize, i * tileSize]}
           stroke="rgba(128, 128, 128, 0.5)"
           strokeWidth={0.5}
         />
@@ -329,7 +341,7 @@ export default function GridAdaptativo() {
   const posKey = (x: number, y: number) => `${x},${y}`;
 
   const paintTile = (x: number, y: number) => {
-    if (x < 0 || x >= numCols || y < 0 || y >= numRows) return;
+    if (!Number.isInteger(x) || !Number.isInteger(y)) return;
 
     const key = posKey(x, y);
 
@@ -1598,28 +1610,59 @@ export default function GridAdaptativo() {
       </div>
 
       {/* Main Canvas Area */}
-      <div className="flex-1 relative overflow-auto">
+      <div className="flex-1 relative">
         {/* Canvas Container */}
-        <div className="w-full h-full overflow-auto bg-gray-100">
+        <div className="w-full h-full bg-gray-100">
           {/* Stage */}
           <Stage
-            width={gridWidth}
-            height={gridHeight}
+            width={window.innerWidth}
+            height={window.innerHeight}
+            ref={stageRef}
+            x={stagePosition.x}
+            y={stagePosition.y}
+            draggable={false}
+            onDragStart={(e) => {
+              // 🛑 Solo permitimos drag si el botón del medio está presionado
+              if (e.evt.button !== 1) {
+                e.cancelBubble = true;
+                e.target.stopDrag();
+              }
+            }}
+            onDragEnd={(e) => {
+              const pos = e.target.position();
+              setStagePosition(pos);
+            }}
             onMouseDown={(e) => {
+              if (e.evt.button === 1) {
+      setIsPanning(true);
+    } else {
               handleMouseDown(e);
               handleClickStage(e);
               if (!isPlacingFog) return;
               const pos = e.target.getStage()?.getPointerPosition();
               if (pos) setFogStart(pos);
-            }}
+            }}}
             onMouseMove={(e) => {
+              if (isPanning && stageRef.current) {
+      const dx = e.evt.movementX;
+      const dy = e.evt.movementY;
+      const stage = stageRef.current;
+      const newPos = {
+        x: stage.x() + dx,
+        y: stage.y() + dy,
+      };
+      stage.position(newPos);
+      setStagePosition(newPos);
+      stage.batchDraw();
+    } else {
               handleMouseMove(e);
               handleMouseMovePlayer(e);
               if (!isPlacingFog) return;
               const pos = e.target.getStage()?.getPointerPosition();
               if (pos) setCurrentMousePos(pos);
-            }}
+            }}}
             onMouseUp={(e) => {
+              setIsPanning(false);
               handleMouseUp(e);
               setIsDraggingPlayer(false);
               setDragOffsets({});
@@ -1651,6 +1694,7 @@ export default function GridAdaptativo() {
             style={{
               backgroundImage: backgroundImage ? `url(${backgroundImage.src})` : "none",
               backgroundSize: "cover",
+              cursor: isPanning ? "grabbing" : "default",
               backgroundPosition: "center",
             }}
             tabIndex={0}
