@@ -18,6 +18,7 @@ let tokens: Record<string, {
     nombre: string;
     vida: string;
     imageBase64?: string; // <-- ✅ permitido
+    muerto?: boolean; // Indica si el token está muerto
 }> = {};
 
 let paintedEdges: Record<string, string> = {};
@@ -331,6 +332,23 @@ wss.on("connection", (ws) => {
                 tokens[id].imageBase64 = base64;
             }
         }
+
+        if (message.type === "UPDATE_TOKEN_DEAD_STATUS") {
+            const { id, muerto } = message.payload;
+            if (tokens[id]) {
+                tokens[id].muerto = muerto;
+            }
+
+            // Reenviar este cambio a todos menos al que lo envió
+            for (const client of clients) {
+                if (client !== ws && client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify(message));
+                }
+            }
+
+            return; // Para no hacer el broadcast general luego
+        }
+
 
 
         // Broadcast

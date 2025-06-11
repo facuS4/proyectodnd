@@ -103,6 +103,7 @@ export default function GridAdaptativo() {
     nombre: string;
     vida: string;
     image?: HTMLImageElement | null;
+    muerto?: boolean; // Indica si el token está muerto
   };
 
   // Estado para los tokens
@@ -120,6 +121,10 @@ export default function GridAdaptativo() {
   const [contextMenuVisible, setContextMenuVisible] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const [contextTokenId, setContextTokenId] = useState<string | null>(null);
+
+  // Token Muerto
+  const [deadTokenIds, setDeadTokenIds] = useState<string[]>([]);
+
 
   //Cerrar el menú del token
   useEffect(() => {
@@ -221,6 +226,57 @@ export default function GridAdaptativo() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedTokenId, tileSize]);
+
+  // Manejo de calavera
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === "x") {
+        setDeadTokenIds(prev => {
+          const affectedIds = multiSelectedIds.length > 0
+            ? multiSelectedIds
+            : selectedTokenId
+              ? [selectedTokenId]
+              : [];
+
+          return prev.includes(affectedIds[0])
+            ? prev.filter(id => !affectedIds.includes(id)) // remover (revivir)
+            : [...prev, ...affectedIds]; // agregar (matar)
+        });
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedTokenId, multiSelectedIds]);
+
+  // useEffect para enviar muerto y revivir tokens
+  const skipNextUpdateRef = useRef(false);
+  useEffect(() => {
+    if (skipNextUpdateRef.current) {
+      skipNextUpdateRef.current = false; // Reseteamos el flag y no enviamos nada esta vez
+      return;
+    }
+
+    if (!socket) return;
+
+    // Mandar mensajes solo si es un cambio local
+    deadTokenIds.forEach(id => {
+      socket.send(JSON.stringify({
+        type: "UPDATE_TOKEN_DEAD_STATUS",
+        payload: { id, muerto: true }
+      }));
+    });
+
+    tokens.forEach(token => {
+      if (!deadTokenIds.includes(token.id)) {
+        socket.send(JSON.stringify({
+          type: "UPDATE_TOKEN_DEAD_STATUS",
+          payload: { id: token.id, muerto: false }
+        }));
+      }
+    });
+  }, [deadTokenIds, tokens, socket]);
+
 
   //#endregion
 
@@ -1197,7 +1253,27 @@ export default function GridAdaptativo() {
               );
             };
             break;
+
+
+          case "UPDATE_TOKEN_DEAD_STATUS": {
+            const { id, muerto } = data.payload;
+            setTokens(prev => prev.map(t =>
+              t.id === id ? { ...t, muerto } : t
+            ));
+
+            skipNextUpdateRef.current = true; // <-- Indicamos que el siguiente cambio no debe enviarse
+
+            setDeadTokenIds(prev => {
+              if (muerto) {
+                return prev.includes(id) ? prev : [...prev, id];
+              } else {
+                return prev.filter(did => did !== id);
+              }
+            });
+            break;
+          }
         }
+
       } catch (err) {
         console.error("Error al parsear mensaje WebSocket:", err);
       }
@@ -1784,17 +1860,41 @@ export default function GridAdaptativo() {
               {/* Círculo de player */}
               {tokens.map((token) => (
                 <React.Fragment key={token.id}>
-                  <Text
-                    x={token.x - token.radius}
-                    y={token.y - token.radius - 18}
-                    width={token.radius * 2}
-                    align="center"
-                    text={token.vida === "0" ? "💀" : token.vida}
-                    fontSize={12}
-                    fill="black"
-                    fontStyle="bold"
-                  />
-
+                  {deadTokenIds.includes(token.id) ? (
+                    <Text
+                      x={token.x - token.radius}
+                      y={token.y - token.radius - 18}
+                      width={token.radius * 2}
+                      align="center"
+                      text="💀"
+                      fontSize={12}
+                      fill="black"
+                      fontStyle="bold"
+                    />
+                  ) : (
+                    <>
+                      <Text
+                        x={token.x - token.radius}
+                        y={token.y - token.radius - 18}
+                        width={token.radius * 2}
+                        align="center"
+                        text={token.vida}
+                        fontSize={12}
+                        fill="black"
+                        fontStyle="bold"
+                      />
+                      <Text
+                        x={token.x - token.radius}
+                        y={token.y + token.radius + 2}
+                        width={token.radius * 2}
+                        align="center"
+                        text={token.nombre}
+                        fontSize={12}
+                        fill="black"
+                        fontStyle="bold"
+                      />
+                    </>
+                  )}
                   {token.image ? (
                     <CircularToken
                       image={token.image}
@@ -1899,17 +1999,6 @@ export default function GridAdaptativo() {
                       }}
                     />
                   )}
-
-                  <Text
-                    x={token.x - token.radius}
-                    y={token.y + token.radius + 2}
-                    width={token.radius * 2}
-                    align="center"
-                    text={token.nombre}
-                    fontSize={12}
-                    fill="black"
-                    fontStyle="bold"
-                  />
                 </React.Fragment>
               ))}
 
