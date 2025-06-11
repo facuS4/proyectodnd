@@ -23,6 +23,7 @@ export default function GridAdaptativo() {
   const [stagePosition, setStagePosition] = useState({ x: 0, y: 0 });
   const stageRef = useRef<any>(null);
   const [isPanning, setIsPanning] = useState(false);
+  const [scale, setScale] = useState(1);
 
   const gridWidth = 2000; // Ancho del grid
   const gridHeight = 1000; // Alto del grid
@@ -1618,9 +1619,37 @@ export default function GridAdaptativo() {
             width={window.innerWidth}
             height={window.innerHeight}
             ref={stageRef}
+            scaleX={scale}
+            scaleY={scale}
             x={stagePosition.x}
             y={stagePosition.y}
             draggable={false}
+            onWheel={(e) => {
+              e.evt.preventDefault();
+
+              const scaleBy = 1.05;
+              const stage = stageRef.current;
+              const oldScale = scale;
+
+              const mousePointTo = {
+                x: (e.evt.offsetX - stage.x()) / oldScale,
+                y: (e.evt.offsetY - stage.y()) / oldScale,
+              };
+
+              const direction = e.evt.deltaY > 0 ? -1 : 1;
+              const newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
+
+              setScale(newScale);
+
+              const newPos = {
+                x: e.evt.offsetX - mousePointTo.x * newScale,
+                y: e.evt.offsetY - mousePointTo.y * newScale,
+              };
+
+              stage.position(newPos);
+              setStagePosition(newPos);
+              stage.batchDraw();
+            }}
             onDragStart={(e) => {
               // 🛑 Solo permitimos drag si el botón del medio está presionado
               if (e.evt.button !== 1) {
@@ -1634,33 +1663,35 @@ export default function GridAdaptativo() {
             }}
             onMouseDown={(e) => {
               if (e.evt.button === 1) {
-      setIsPanning(true);
-    } else {
-              handleMouseDown(e);
-              handleClickStage(e);
-              if (!isPlacingFog) return;
-              const pos = e.target.getStage()?.getPointerPosition();
-              if (pos) setFogStart(pos);
-            }}}
+                setIsPanning(true);
+              } else {
+                handleMouseDown(e);
+                handleClickStage(e);
+                if (!isPlacingFog) return;
+                const pos = e.target.getStage()?.getPointerPosition();
+                if (pos) setFogStart(pos);
+              }
+            }}
             onMouseMove={(e) => {
               if (isPanning && stageRef.current) {
-      const dx = e.evt.movementX;
-      const dy = e.evt.movementY;
-      const stage = stageRef.current;
-      const newPos = {
-        x: stage.x() + dx,
-        y: stage.y() + dy,
-      };
-      stage.position(newPos);
-      setStagePosition(newPos);
-      stage.batchDraw();
-    } else {
-              handleMouseMove(e);
-              handleMouseMovePlayer(e);
-              if (!isPlacingFog) return;
-              const pos = e.target.getStage()?.getPointerPosition();
-              if (pos) setCurrentMousePos(pos);
-            }}}
+                const dx = e.evt.movementX;
+                const dy = e.evt.movementY;
+                const stage = stageRef.current;
+                const newPos = {
+                  x: stage.x() + dx,
+                  y: stage.y() + dy,
+                };
+                stage.position(newPos);
+                setStagePosition(newPos);
+                stage.batchDraw();
+              } else {
+                handleMouseMove(e);
+                handleMouseMovePlayer(e);
+                if (!isPlacingFog) return;
+                const pos = e.target.getStage()?.getPointerPosition();
+                if (pos) setCurrentMousePos(pos);
+              }
+            }}
             onMouseUp={(e) => {
               setIsPanning(false);
               handleMouseUp(e);
