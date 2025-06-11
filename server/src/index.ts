@@ -349,6 +349,22 @@ wss.on("connection", (ws) => {
             return; // Para no hacer el broadcast general luego
         }
 
+        if (message.type === "UPDATE_TOKEN") {
+            const { id, updates } = message.payload;
+            if (tokens[id]) {
+                Object.assign(tokens[id], updates);
+            }
+
+            // Reenviar a los demás
+            for (const client of clients) {
+                if (client !== ws && client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify(message));
+                }
+            }
+
+            return; // evitar broadcast duplicado
+        }
+
 
 
         // Broadcast

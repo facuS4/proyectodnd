@@ -420,6 +420,18 @@ export default function GridAdaptativo() {
     }));
   };
 
+  function sendTokenUpdate(id: string, updates: Partial<Token>) {
+    const { vida, ...filteredUpdates } = updates;
+
+    socket.send(JSON.stringify({
+      type: "UPDATE_TOKEN",
+      payload: {
+        id,
+        updates: isDmMode ? updates : filteredUpdates,
+      },
+    }));
+  }
+
   //#endregion
 
   //#region BACKGROUND IMAGES
@@ -1285,6 +1297,14 @@ export default function GridAdaptativo() {
             });
             break;
           }
+
+          case "UPDATE_TOKEN": {
+            const { id, updates } = data.payload;
+            setTokens((tokens) =>
+              tokens.map((t) => (t.id === id ? { ...t, ...updates } : t))
+            );
+            break;
+          }
         }
 
       } catch (err) {
@@ -1948,6 +1968,8 @@ export default function GridAdaptativo() {
                     />
                   ) : (
                     <>
+                    {/* Mostrar vida localmente si sos dm */}
+                    {isDmMode && (
                       <Text
                         x={token.x - token.radius}
                         y={token.y - token.radius - 18}
@@ -1958,6 +1980,7 @@ export default function GridAdaptativo() {
                         fill="black"
                         fontStyle="bold"
                       />
+                    )}
                       <Text
                         x={token.x - token.radius}
                         y={token.y + token.radius + 2}
@@ -2288,6 +2311,7 @@ export default function GridAdaptativo() {
                           t.id === contextTokenId ? { ...t, color: newColor } : t
                         )
                       );
+                      sendTokenUpdate(contextTokenId, { color: newColor });
                     }}
                   />
                 </div>
@@ -2305,6 +2329,7 @@ export default function GridAdaptativo() {
                           t.id === contextTokenId ? { ...t, nombre: value } : t
                         )
                       );
+                      sendTokenUpdate(contextTokenId, { nombre: value });
                     }}
                   />
                 </div>
