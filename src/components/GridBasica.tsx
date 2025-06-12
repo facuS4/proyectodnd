@@ -1724,7 +1724,7 @@ export default function GridAdaptativo() {
               }
             }}
             onMouseMove={(e) => {
-              if (isPanning && stageRef.current) {
+              if (isPanning && !isDraggingNode && stageRef.current) {
                 const dx = e.evt.movementX;
                 const dy = e.evt.movementY;
                 const stage = stageRef.current;
@@ -1735,7 +1735,6 @@ export default function GridAdaptativo() {
                 stage.position(newPos);
                 setStagePosition(newPos);
                 stage.batchDraw();
-                return;
               }
 
               handleMouseMove(e);
@@ -1805,14 +1804,26 @@ export default function GridAdaptativo() {
                   stroke="black"
                   strokeWidth={selectedImageId === shape.id ? 2 : 0}
                   draggable
-                  onClick={() => setSelectedImageId(shape.id)}
-                  onDragStart={() => {
+                  ref={(node: any) => {
+                    if (node) imageShapeRefs.current.set(shape.id, node); // ← opcional si querés manejar transformerRef como en areas
+                  }}
+                  onClick={(e) => {
+                    e.cancelBubble = true;
+                    setSelectedImageId(shape.id);
+                  }}
+                  onTap={(e) => {
+                    e.cancelBubble = true;
+                    setSelectedImageId(shape.id);
+                  }}
+                  onDragStart={(e) => {
+                    e.cancelBubble = true;
                     setIsDraggingNode(true);
                   }}
                   onDragMove={(e) => {
-                    e.cancelBubble = true; // esto evita pan del Stage
+                    e.cancelBubble = true;
                   }}
                   onDragEnd={(e) => {
+                    e.cancelBubble = true;
                     setIsDraggingNode(false);
                     const node = e.target;
                     const newX = node.x();
@@ -1837,15 +1848,68 @@ export default function GridAdaptativo() {
                       })
                     );
                   }}
+                  onTransformEnd={(e) => {
+                    e.cancelBubble = true;
+                    const node = e.target;
+                    const scaleX = node.scaleX();
+                    const scaleY = node.scaleY();
+
+                    node.scaleX(1);
+                    node.scaleY(1);
+
+                    const newWidth = shape.width * scaleX;
+                    const newHeight = shape.height * scaleY;
+
+                    setImageShapes((prev) =>
+                      prev.map((s) =>
+                        s.id === shape.id
+                          ? { ...s, width: newWidth, height: newHeight }
+                          : s
+                      )
+                    );
+
+                    socket.send(
+                      JSON.stringify({
+                        type: "RESIZE_BACKGROUND_IMAGE",
+                        payload: {
+                          id: shape.id,
+                          width: newWidth,
+                          height: newHeight,
+                        },
+                      })
+                    );
+                  }}
+                  onContextMenu={(e) => {
+                    e.evt.preventDefault();
+                    e.cancelBubble = true;
+                    setImageShapes((prev) => prev.filter((s) => s.id !== shape.id));
+                    if (selectedImageId === shape.id) setSelectedImageId(null);
+
+                    socket.send(
+                      JSON.stringify({
+                        type: "DELETE_BACKGROUND_IMAGE",
+                        payload: { id: shape.id },
+                      })
+                    );
+                  }}
                 />
-
-
               ))}
 
               <Transformer
                 ref={imageTransformerRef}
                 enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
                 rotateEnabled={false}
+                onDragStart={(e) => {
+                  e.cancelBubble = true;
+                  setIsDraggingNode(true);
+                }}
+                onDragEnd={(e) => {
+                  e.cancelBubble = true;
+                  setIsDraggingNode(false);
+                }}
+                onDragMove={(e) => {
+                  e.cancelBubble = true;
+                }}
               />
 
               {/* Area de Selección */}
@@ -2186,7 +2250,13 @@ export default function GridAdaptativo() {
                 };
 
                 if (shape.type === "circle") {
-                  return <Circle key={shape.id} {...commonProps} radius={shape.size / 2} onDragStart={() => setIsDraggingNode(true)} onDragMove={(e) => { e.cancelBubble = true; }} onDragEnd={() => setIsDraggingNode(false)} />;
+                  return <Circle key={shape.id} {...commonProps} radius={shape.size / 2} onDragStart={(e) => {
+                    e.cancelBubble = true;
+                    setIsDraggingNode(true);
+                  }} onDragMove={(e) => { e.cancelBubble = true; }} onDragEnd={(e) => {
+                    e.cancelBubble = true;
+                    setIsDraggingNode(false);
+                  }} />;
                 }
 
                 if (shape.type === "square") {
@@ -2198,11 +2268,17 @@ export default function GridAdaptativo() {
                       height={shape.size}
                       offsetX={shape.size / 2}
                       offsetY={shape.size / 2}
-                      onDragStart={() => setIsDraggingNode(true)}
+                      onDragStart={(e) => {
+                        e.cancelBubble = true;
+                        setIsDraggingNode(true);
+                      }}
                       onDragMove={(e) => {
                         e.cancelBubble = true;
                       }}
-                      onDragEnd={() => setIsDraggingNode(false)}
+                      onDragEnd={(e) => {
+                        e.cancelBubble = true;
+                        setIsDraggingNode(false);
+                      }}
                     />
                   );
                 }
@@ -2222,11 +2298,17 @@ export default function GridAdaptativo() {
                       offsetX={0}
                       offsetY={0}
                       rotation={shape.rotation || 0}
-                      onDragStart={() => setIsDraggingNode(true)}
+                      onDragStart={(e) => {
+                        e.cancelBubble = true;
+                        setIsDraggingNode(true);
+                      }}
                       onDragMove={(e) => {
                         e.cancelBubble = true;
                       }}
-                      onDragEnd={() => setIsDraggingNode(false)}
+                      onDragEnd={(e) => {
+                        e.cancelBubble = true;
+                        setIsDraggingNode(false);
+                      }}
                     />
                   );
                 }
@@ -2238,6 +2320,17 @@ export default function GridAdaptativo() {
                 ref={transformerRef}
                 rotateEnabled={true}
                 enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
+                onDragStart={(e) => {
+                  e.cancelBubble = true;
+                  setIsDraggingNode(true);
+                }}
+                onDragEnd={(e) => {
+                  e.cancelBubble = true;
+                  setIsDraggingNode(false);
+                }}
+                onDragMove={(e) => {
+                  e.cancelBubble = true;
+                }}
               />
 
               {laserMode && laserPath.length > 1 && (
