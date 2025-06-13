@@ -178,6 +178,14 @@ wss.on("connection", (ws) => {
                 areas[id].x = x;
                 areas[id].y = y;
             }
+
+            for (const client of clients) {
+                if (client !== ws && client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify(message));
+                }
+            }
+
+            return;
         }
 
         if (message.type === "TRANSFORM_AREA") {
@@ -186,6 +194,14 @@ wss.on("connection", (ws) => {
                 areas[id].size = size;
                 areas[id].rotation = rotation;
             }
+
+            for (const client of clients) {
+                if (client !== ws && client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify(message));
+                }
+            }
+
+            return;
         }
 
         if (message.type === "DELETE_AREA") {

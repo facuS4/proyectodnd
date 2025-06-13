@@ -2185,29 +2185,6 @@ export default function GridAdaptativo() {
                   },
                   onClick: () => setSelectedAreaId(shape.id),
                   onTap: () => setSelectedAreaId(shape.id),
-                  onDragEnd: (e: any) => {
-                    const node = e.target;
-                    const offsetX = node.offsetX();
-                    const offsetY = node.offsetY();
-
-                    const newX = node.x() + offsetX;
-                    const newY = node.y() + offsetY;
-
-                    setAreaShapes(prev =>
-                      prev.map(s =>
-                        s.id === shape.id ? { ...s, x: newX, y: newY } : s
-                      )
-                    );
-
-                    socket.send(JSON.stringify({
-                      type: "MOVE_AREA",
-                      payload: {
-                        id: shape.id,
-                        x: newX,
-                        y: newY
-                      }
-                    }));
-                  },
                   onTransformEnd: (e: any) => {
                     const node = e.target;
                     const scaleX = node.scaleX();
@@ -2250,13 +2227,35 @@ export default function GridAdaptativo() {
                 };
 
                 if (shape.type === "circle") {
-                  return <Circle key={shape.id} {...commonProps} radius={shape.size / 2} onDragStart={(e) => {
-                    e.cancelBubble = true;
-                    setIsDraggingNode(true);
-                  }} onDragMove={(e) => { e.cancelBubble = true; }} onDragEnd={(e) => {
-                    e.cancelBubble = true;
-                    setIsDraggingNode(false);
-                  }} />;
+                  return <Circle key={shape.id} {...commonProps} radius={shape.size / 2}
+                    onDragStart={(e) => {
+                      e.cancelBubble = true;
+                      setIsDraggingNode(true);
+                    }} onDragMove={(e) => { e.cancelBubble = true; }}
+                    onDragEnd={(e) => {
+                      e.cancelBubble = true;
+                      setIsDraggingNode(false);
+                      const node = e.target;
+                      const newX = node.x();
+                      const newY = node.y();
+                      console.log("✔️ Drag terminado Circle", shape.id);
+
+                      setAreaShapes(prev =>
+                        prev.map(s =>
+                          s.id === shape.id ? { ...s, x: newX, y: newY } : s
+                        )
+                      );
+
+                      socket.send(JSON.stringify({
+                        type: "MOVE_AREA",
+                        payload: {
+                          id: shape.id,
+                          x: newX,
+                          y: newY,
+                        }
+                      }));
+                    }}
+                  />;
                 }
 
                 if (shape.type === "square") {
@@ -2278,6 +2277,25 @@ export default function GridAdaptativo() {
                       onDragEnd={(e) => {
                         e.cancelBubble = true;
                         setIsDraggingNode(false);
+
+                        const node = e.target;
+                        const newX = node.x();
+                        const newY = node.y();
+
+                        setAreaShapes(prev =>
+                          prev.map(s =>
+                            s.id === shape.id ? { ...s, x: newX, y: newY } : s
+                          )
+                        );
+
+                        socket.send(JSON.stringify({
+                          type: "MOVE_AREA",
+                          payload: {
+                            id: shape.id,
+                            x: newX,
+                            y: newY,
+                          }
+                        }));
                       }}
                     />
                   );
@@ -2308,6 +2326,25 @@ export default function GridAdaptativo() {
                       onDragEnd={(e) => {
                         e.cancelBubble = true;
                         setIsDraggingNode(false);
+
+                        const node = e.target;
+                        const newX = node.x();
+                        const newY = node.y();
+
+                        setAreaShapes(prev =>
+                          prev.map(s =>
+                            s.id === shape.id ? { ...s, x: newX, y: newY } : s
+                          )
+                        );
+
+                        socket.send(JSON.stringify({
+                          type: "MOVE_AREA",
+                          payload: {
+                            id: shape.id,
+                            x: newX,
+                            y: newY,
+                          }
+                        }));
                       }}
                     />
                   );
