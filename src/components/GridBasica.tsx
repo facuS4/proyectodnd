@@ -40,52 +40,52 @@ export default function GridAdaptativo() {
   const [backgroundImage] = useState<HTMLImageElement | null>(null);
 
   //Dibujar la Grid
-const drawGrid = () => {
-  const lines: JSX.Element[] = [];
+  const drawGrid = () => {
+    const lines: JSX.Element[] = [];
 
-  if (!stageRef.current) return lines;
+    if (!stageRef.current) return lines;
 
-  const stage = stageRef.current;
-  const scale = stage.scaleX(); // Suponemos escala uniforme
+    const stage = stageRef.current;
+    const scale = stage.scaleX(); // Suponemos escala uniforme
 
-  const viewWidth = stage.width() / scale;
-  const viewHeight = stage.height() / scale;
+    const viewWidth = stage.width() / scale;
+    const viewHeight = stage.height() / scale;
 
-  const posX = -stage.x() / scale;
-  const posY = -stage.y() / scale;
+    const posX = -stage.x() / scale;
+    const posY = -stage.y() / scale;
 
-  const padding = 5;
+    const padding = 5;
 
-  const startX = Math.floor(posX / tileSize) - padding;
-  const endX = Math.floor((posX + viewWidth) / tileSize) + padding;
+    const startX = Math.floor(posX / tileSize) - padding;
+    const endX = Math.floor((posX + viewWidth) / tileSize) + padding;
 
-  const startY = Math.floor(posY / tileSize) - padding;
-  const endY = Math.floor((posY + viewHeight) / tileSize) + padding;
+    const startY = Math.floor(posY / tileSize) - padding;
+    const endY = Math.floor((posY + viewHeight) / tileSize) + padding;
 
-  for (let i = startX; i <= endX; i++) {
-    lines.push(
-      <Line
-        key={`v-${i}`}
-        points={[i * tileSize, startY * tileSize, i * tileSize, endY * tileSize]}
-        stroke="rgba(128, 128, 128, 0.5)"
-        strokeWidth={0.5}
-      />
-    );
-  }
+    for (let i = startX; i <= endX; i++) {
+      lines.push(
+        <Line
+          key={`v-${i}`}
+          points={[i * tileSize, startY * tileSize, i * tileSize, endY * tileSize]}
+          stroke="rgba(128, 128, 128, 0.5)"
+          strokeWidth={0.5}
+        />
+      );
+    }
 
-  for (let i = startY; i <= endY; i++) {
-    lines.push(
-      <Line
-        key={`h-${i}`}
-        points={[startX * tileSize, i * tileSize, endX * tileSize, i * tileSize]}
-        stroke="rgba(128, 128, 128, 0.5)"
-        strokeWidth={0.5}
-      />
-    );
-  }
+    for (let i = startY; i <= endY; i++) {
+      lines.push(
+        <Line
+          key={`h-${i}`}
+          points={[startX * tileSize, i * tileSize, endX * tileSize, i * tileSize]}
+          stroke="rgba(128, 128, 128, 0.5)"
+          strokeWidth={0.5}
+        />
+      );
+    }
 
-  return lines;
-};
+    return lines;
+  };
 
   const getWorldPos = () => {
     const stage = stageRef.current;
@@ -1357,8 +1357,6 @@ const drawGrid = () => {
 
   //#endregion
 
-
-
   return (
     <div className="flex flex-col h-screen bg-content1">
       {/* Top Bar */}
@@ -1592,7 +1590,6 @@ const drawGrid = () => {
                   isIconOnly
                   variant="light"
                   size="sm"
-                // ✅ Elimina el onClick de acá
                 >
                   <Icon icon="lucide:settings" width={20} />
                 </Button>
@@ -1626,7 +1623,13 @@ const drawGrid = () => {
           <Button
             color={isDmMode ? "primary" : "default"}
             variant="flat"
-            onClick={() => setIsDmMode(prev => !prev)}
+            onClick={() => {
+              const nextMode = !isDmMode;
+              setIsDmMode(nextMode);
+              if (!nextMode) {
+                setActiveTool(false); // 👈 Al salir de DM, limpiamos la herramienta activa
+              }
+            }}
           >
             {isDmMode ? "Leave DM mode" : "Join as DM"}
           </Button>
