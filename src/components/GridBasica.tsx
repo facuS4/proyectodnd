@@ -1288,6 +1288,16 @@ export default function GridAdaptativo() {
             break;
           }
 
+          case "RESIZE_BACKGROUND_IMAGE":
+            setImageShapes((prev) =>
+              prev.map((img) =>
+                img.id === data.payload.id
+                  ? { ...img, width: data.payload.width, height: data.payload.height }
+                  : img
+              )
+            );
+            break;
+
           case "TOKEN_IMAGE":
             const { id, base64 } = data.payload;
             const img = new window.Image();
@@ -1848,37 +1858,6 @@ export default function GridAdaptativo() {
                       })
                     );
                   }}
-                  onTransformEnd={(e) => {
-                    e.cancelBubble = true;
-                    const node = e.target;
-                    const scaleX = node.scaleX();
-                    const scaleY = node.scaleY();
-
-                    node.scaleX(1);
-                    node.scaleY(1);
-
-                    const newWidth = shape.width * scaleX;
-                    const newHeight = shape.height * scaleY;
-
-                    setImageShapes((prev) =>
-                      prev.map((s) =>
-                        s.id === shape.id
-                          ? { ...s, width: newWidth, height: newHeight }
-                          : s
-                      )
-                    );
-
-                    socket.send(
-                      JSON.stringify({
-                        type: "RESIZE_BACKGROUND_IMAGE",
-                        payload: {
-                          id: shape.id,
-                          width: newWidth,
-                          height: newHeight,
-                        },
-                      })
-                    );
-                  }}
                   onContextMenu={(e) => {
                     e.evt.preventDefault();
                     e.cancelBubble = true;
@@ -1909,6 +1888,42 @@ export default function GridAdaptativo() {
                 }}
                 onDragMove={(e) => {
                   e.cancelBubble = true;
+                }}
+                onTransformEnd={(e) => {
+                  e.cancelBubble = true;
+
+                  if (!selectedImageId) return; // ✅ Detenemos si es null
+
+                  const node = imageShapeRefs.current.get(selectedImageId);
+                  if (!node) return;
+
+                  const scaleX = node.scaleX();
+                  const scaleY = node.scaleY();
+
+                  node.scaleX(1);
+                  node.scaleY(1);
+
+                  const newWidth = node.width() * scaleX;
+                  const newHeight = node.height() * scaleY;
+
+                  setImageShapes((prev) =>
+                    prev.map((s) =>
+                      s.id === selectedImageId
+                        ? { ...s, width: newWidth, height: newHeight }
+                        : s
+                    )
+                  );
+
+                  socket.send(
+                    JSON.stringify({
+                      type: "RESIZE_BACKGROUND_IMAGE",
+                      payload: {
+                        id: selectedImageId,
+                        width: newWidth,
+                        height: newHeight,
+                      },
+                    })
+                  );
                 }}
               />
 

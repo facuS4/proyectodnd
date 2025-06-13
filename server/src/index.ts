@@ -316,6 +316,28 @@ wss.on("connection", (ws) => {
             return;
         }
 
+        if (message.type === "RESIZE_BACKGROUND_IMAGE") {
+            const { id, width, height } = message.payload;
+
+            // Buscar la imagen y actualizar su tamaño
+            const image = backgroundImages.find((img) => img.id === id);
+            if (image) {
+                image.width = width;
+                image.height = height;
+            }
+
+            // Reenviar a todos los demás clientes
+            for (const client of clients) {
+                if (client !== ws && client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify(message));
+                }
+            }
+
+            return;
+        }
+
+
+
         if (message.type === "FOG_ADD_TILES") {
             if (Array.isArray(message.payload)) {
                 message.payload.forEach((tile: string) => foggedTiles.add(tile));
