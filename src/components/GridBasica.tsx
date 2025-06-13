@@ -40,42 +40,52 @@ export default function GridAdaptativo() {
   const [backgroundImage] = useState<HTMLImageElement | null>(null);
 
   //Dibujar la Grid
-  const drawGrid = () => {
-    const lines = [];
+const drawGrid = () => {
+  const lines: JSX.Element[] = [];
 
-    const padding = 5; // cantidad de tiles extra para renderizar fuera de pantalla
-    const viewWidth = window.innerWidth;
-    const viewHeight = window.innerHeight;
+  if (!stageRef.current) return lines;
 
-    const startX = Math.floor(-stagePosition.x / tileSize) - padding;
-    const endX = Math.floor((-stagePosition.x + viewWidth) / tileSize) + padding;
-    const startY = Math.floor(-stagePosition.y / tileSize) - padding;
-    const endY = Math.floor((-stagePosition.y + viewHeight) / tileSize) + padding;
+  const stage = stageRef.current;
+  const scale = stage.scaleX(); // Suponemos escala uniforme
 
-    for (let i = startX; i <= endX; i++) {
-      lines.push(
-        <Line
-          key={`v-${i}`}
-          points={[i * tileSize, startY * tileSize, i * tileSize, endY * tileSize]}
-          stroke="rgba(128, 128, 128, 0.5)"
-          strokeWidth={0.5}
-        />
-      );
-    }
+  const viewWidth = stage.width() / scale;
+  const viewHeight = stage.height() / scale;
 
-    for (let i = startY; i <= endY; i++) {
-      lines.push(
-        <Line
-          key={`h-${i}`}
-          points={[startX * tileSize, i * tileSize, endX * tileSize, i * tileSize]}
-          stroke="rgba(128, 128, 128, 0.5)"
-          strokeWidth={0.5}
-        />
-      );
-    }
+  const posX = -stage.x() / scale;
+  const posY = -stage.y() / scale;
 
-    return lines;
-  };
+  const padding = 5;
+
+  const startX = Math.floor(posX / tileSize) - padding;
+  const endX = Math.floor((posX + viewWidth) / tileSize) + padding;
+
+  const startY = Math.floor(posY / tileSize) - padding;
+  const endY = Math.floor((posY + viewHeight) / tileSize) + padding;
+
+  for (let i = startX; i <= endX; i++) {
+    lines.push(
+      <Line
+        key={`v-${i}`}
+        points={[i * tileSize, startY * tileSize, i * tileSize, endY * tileSize]}
+        stroke="rgba(128, 128, 128, 0.5)"
+        strokeWidth={0.5}
+      />
+    );
+  }
+
+  for (let i = startY; i <= endY; i++) {
+    lines.push(
+      <Line
+        key={`h-${i}`}
+        points={[startX * tileSize, i * tileSize, endX * tileSize, i * tileSize]}
+        stroke="rgba(128, 128, 128, 0.5)"
+        strokeWidth={0.5}
+      />
+    );
+  }
+
+  return lines;
+};
 
   const getWorldPos = () => {
     const stage = stageRef.current;
