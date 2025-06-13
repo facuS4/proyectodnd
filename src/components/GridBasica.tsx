@@ -1813,7 +1813,7 @@ export default function GridAdaptativo() {
                   offsetY={0}
                   stroke="black"
                   strokeWidth={selectedImageId === shape.id ? 2 : 0}
-                  draggable
+                  draggable={isDmMode}
                   ref={(node: any) => {
                     if (node) imageShapeRefs.current.set(shape.id, node); // ← opcional si querés manejar transformerRef como en areas
                   }}
@@ -1874,58 +1874,60 @@ export default function GridAdaptativo() {
                 />
               ))}
 
-              <Transformer
-                ref={imageTransformerRef}
-                enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
-                rotateEnabled={false}
-                onDragStart={(e) => {
-                  e.cancelBubble = true;
-                  setIsDraggingNode(true);
-                }}
-                onDragEnd={(e) => {
-                  e.cancelBubble = true;
-                  setIsDraggingNode(false);
-                }}
-                onDragMove={(e) => {
-                  e.cancelBubble = true;
-                }}
-                onTransformEnd={(e) => {
-                  e.cancelBubble = true;
+              {isDmMode && selectedImageId && (
+                <Transformer
+                  ref={imageTransformerRef}
+                  enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
+                  rotateEnabled={false}
+                  onDragStart={(e) => {
+                    e.cancelBubble = true;
+                    setIsDraggingNode(true);
+                  }}
+                  onDragEnd={(e) => {
+                    e.cancelBubble = true;
+                    setIsDraggingNode(false);
+                  }}
+                  onDragMove={(e) => {
+                    e.cancelBubble = true;
+                  }}
+                  onTransformEnd={(e) => {
+                    e.cancelBubble = true;
 
-                  if (!selectedImageId) return; // ✅ Detenemos si es null
+                    if (!selectedImageId) return; // ✅ Detenemos si es null
 
-                  const node = imageShapeRefs.current.get(selectedImageId);
-                  if (!node) return;
+                    const node = imageShapeRefs.current.get(selectedImageId);
+                    if (!node) return;
 
-                  const scaleX = node.scaleX();
-                  const scaleY = node.scaleY();
+                    const scaleX = node.scaleX();
+                    const scaleY = node.scaleY();
 
-                  node.scaleX(1);
-                  node.scaleY(1);
+                    node.scaleX(1);
+                    node.scaleY(1);
 
-                  const newWidth = node.width() * scaleX;
-                  const newHeight = node.height() * scaleY;
+                    const newWidth = node.width() * scaleX;
+                    const newHeight = node.height() * scaleY;
 
-                  setImageShapes((prev) =>
-                    prev.map((s) =>
-                      s.id === selectedImageId
-                        ? { ...s, width: newWidth, height: newHeight }
-                        : s
-                    )
-                  );
+                    setImageShapes((prev) =>
+                      prev.map((s) =>
+                        s.id === selectedImageId
+                          ? { ...s, width: newWidth, height: newHeight }
+                          : s
+                      )
+                    );
 
-                  socket.send(
-                    JSON.stringify({
-                      type: "RESIZE_BACKGROUND_IMAGE",
-                      payload: {
-                        id: selectedImageId,
-                        width: newWidth,
-                        height: newHeight,
-                      },
-                    })
-                  );
-                }}
-              />
+                    socket.send(
+                      JSON.stringify({
+                        type: "RESIZE_BACKGROUND_IMAGE",
+                        payload: {
+                          id: selectedImageId,
+                          width: newWidth,
+                          height: newHeight,
+                        },
+                      })
+                    );
+                  }}
+                />
+              )}
 
               {/* Area de Selección */}
               {selectionRect && (
