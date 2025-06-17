@@ -643,7 +643,7 @@ export default function GridAdaptativo() {
   const handleMouseMovePlayer = (e: any) => {
     if (!moveMode || !isDraggingPlayer || Object.keys(dragOffsets).length === 0) return;
 
-    const world = getWorldPos(); // ✅ usamos coordenadas del mundo
+    const world = getWorldPos();
     if (!world) return;
 
     setTokens((tokens) =>
@@ -1366,7 +1366,7 @@ export default function GridAdaptativo() {
       {/* Top Bar */}
       {isDmMode && (
         <>
-          <div className="flex flex-wrap items-center p-3 bg-content2 border-b border-default-200 gap-3 shadow-sm">
+          <div className="absolute top-0 left-0 right-0 z-20 p-2 flex flex-wrap items-center gap-3 pointer-events-auto">
             {/* Color Picker */}
             <div className="flex items-center">
               <ColorPalette
@@ -1377,14 +1377,10 @@ export default function GridAdaptativo() {
               />
             </div>
 
-            <Divider orientation="vertical" className="h-8 mx-2" />
-
             {/* Audio Panel */}
             <div className="flex items-center">
               <AudioPanel />
             </div>
-
-            <Divider orientation="vertical" className="h-8 mx-2" />
 
             {/* Hidden Image Upload */}
             <input
@@ -1491,7 +1487,9 @@ export default function GridAdaptativo() {
 
 
       {/* Tool Buttons Row - Moved from sides to top */}
-      <div className="flex justify-between items-center p-2 bg-content1 border-b border-default-200">
+      <div className={`absolute left-0 right-0 z-10 p-2 flex justify-between items-center pointer-events-auto
+    ${isDmMode ? "top-[50px]" : "top-0"}
+  `}>
         {/* Left Tool Buttons - Now at top */}
         <div className="flex">
           <ButtonGroup className="shadow-sm rounded-lg overflow-hidden">
@@ -1661,9 +1659,9 @@ export default function GridAdaptativo() {
       </div>
 
       {/* Main Canvas Area */}
-      <div className="flex-1 relative">
+      <div className="relative w-full h-full">
         {/* Canvas Container */}
-        <div className="w-full h-full bg-gray-100">
+        <div className="absolute inset-0 z-0">
           {/* Stage */}
           <Stage
             width={windowSize.width}
@@ -2086,9 +2084,9 @@ export default function GridAdaptativo() {
                       x={token.x}
                       y={token.y}
                       radius={token.radius}
-                      onMouseDown={(e) => {
+                      onMouseDown={() => {
                         if (moveMode) {
-                          const world = getWorldPos(); // ✅ obtenemos coordenadas del mundo
+                          const world = getWorldPos();
                           const offsets: { [id: string]: { dx: number; dy: number } } = {};
                           if (!world) return;
 
