@@ -281,19 +281,6 @@ wss.on("connection", (ws) => {
             return;
         }
 
-        if (message.type === "CLEAR_BACKGROUND_IMAGES") {
-            // Limpiar todas las imágenes de fondo en el servidor
-            backgroundImages = [];
-
-            for (const client of clients) {
-                if (client !== ws && client.readyState === WebSocket.OPEN) {
-                    client.send(JSON.stringify(message));
-                }
-            }
-
-            return;
-        }
-
         if (message.type === "MOVE_BACKGROUND_IMAGE") {
             const { id, x, y, width, height } = message.payload;
 

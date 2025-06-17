@@ -98,6 +98,17 @@ export default function GridAdaptativo() {
     return pos;
   };
 
+  const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   //#endregion
 
   //#region FOG
@@ -630,22 +641,21 @@ export default function GridAdaptativo() {
 
   // Movimiento con mouse
   const handleMouseMovePlayer = (e: any) => {
-    if (!moveMode || !isDraggingPlayer || Object.keys(dragOffsets).length === 0)
-      return;
+    if (!moveMode || !isDraggingPlayer || Object.keys(dragOffsets).length === 0) return;
 
-    const stage = e.target.getStage();
-    const pos = stage?.getPointerPosition();
-    if (!pos) return;
+    const world = getWorldPos(); // ✅ usamos coordenadas del mundo
+    if (!world) return;
 
     setTokens((tokens) =>
       tokens.map((token) => {
         if (dragOffsets[token.id]) {
           const { dx, dy } = dragOffsets[token.id];
-          const newX = pos.x + dx;
-          const newY = pos.y + dy;
+
+          const newX = world.x + dx; // ✅ corregido
+          const newY = world.y + dy; // ✅ corregido
+
           const snapped = snapToGrid(newX, newY, token.radius);
 
-          // Emitimos el movimiento
           socket.send(JSON.stringify({
             type: "MOVE_TOKEN",
             payload: {
@@ -865,15 +875,14 @@ export default function GridAdaptativo() {
 
     //Mover multiples tokens seleccionados
     if (moveMode && isShiftDown && selectionStart) {
-      const stage = e.target.getStage();
-      const pos = stage?.getPointerPosition();
-      if (pos) {
-        const x = Math.min(selectionStart.x, pos.x);
-        const y = Math.min(selectionStart.y, pos.y);
-        const width = Math.abs(pos.x - selectionStart.x);
-        const height = Math.abs(pos.y - selectionStart.y);
-        setSelectionRect({ x, y, width, height });
-      }
+      const world = getWorldPos(); // 👈 usamos mundo real
+      if (!world) return;
+
+      const x = Math.min(selectionStart.x, world.x);
+      const y = Math.min(selectionStart.y, world.y);
+      const width = Math.abs(world.x - selectionStart.x);
+      const height = Math.abs(world.y - selectionStart.y);
+      setSelectionRect({ x, y, width, height });
     }
 
     //Mover la regla
@@ -1283,11 +1292,6 @@ export default function GridAdaptativo() {
             setImageShapes(prev => prev.filter(img => img.id !== deletedId));
             break;
 
-          case "CLEAR_BACKGROUND_IMAGES":
-            setImageShapes([]);
-            setSelectedImageId(null);
-            break;
-
           case "MOVE_BACKGROUND_IMAGE": {
             const { id, x, y, width, height } = data.payload;
             setImageShapes((prev) =>
@@ -1466,25 +1470,6 @@ export default function GridAdaptativo() {
                 }}
               >
                 Remove Background
-              </Button>
-            </Tooltip>
-
-            <Tooltip content="Clear background image">
-              <Button
-                color="default"
-                variant="flat"
-                startContent={<Icon icon="lucide:trash" />}
-                onClick={() => {
-                  setImageShapes([]);
-                  setSelectedImageId(null);
-
-                  socket.send(JSON.stringify({
-                    type: "CLEAR_BACKGROUND_IMAGES",
-                  }));
-
-                }}
-              >
-                Clear Background
               </Button>
             </Tooltip>
 
@@ -1681,8 +1666,8 @@ export default function GridAdaptativo() {
         <div className="w-full h-full bg-gray-100">
           {/* Stage */}
           <Stage
-            width={window.innerWidth}
-            height={window.innerHeight}
+            width={windowSize.width}
+            height={windowSize.height}
             ref={stageRef}
             scaleX={scale}
             scaleY={scale}
@@ -1808,8 +1793,6 @@ export default function GridAdaptativo() {
             tabIndex={0}
           >
             <Layer>
-              {drawGrid()}
-
               {imageShapes.map((shape) => (
                 <Rect
                   key={shape.id}
@@ -1941,6 +1924,8 @@ export default function GridAdaptativo() {
                   }}
                 />
               )}
+
+              {drawGrid()}
 
               {/* Area de Selección */}
               {selectionRect && (
@@ -2103,34 +2088,29 @@ export default function GridAdaptativo() {
                       radius={token.radius}
                       onMouseDown={(e) => {
                         if (moveMode) {
-                          const stage = e.target.getStage();
-                          const pos = stage?.getPointerPosition();
+                          const world = getWorldPos(); // ✅ obtenemos coordenadas del mundo
                           const offsets: { [id: string]: { dx: number; dy: number } } = {};
-                          if (!pos) return;
+                          if (!world) return;
 
                           setSelectedTokenId(token.id);
-                          if (multiSelectedIds.length > 1 || (multiSelectedIds.length === 1 && multiSelectedIds[0] !== token.id)) {
-                            setMultiSelectedIds([token.id]);
-                          }
-                          setIsDraggingPlayer(true);
-                          setDragOffsets(offsets);
 
-                          // Obtener tokens a mover (el seleccionado o todos los múltiples)
                           const movingIds = multiSelectedIds.length > 0
                             ? multiSelectedIds.includes(token.id)
                               ? multiSelectedIds
                               : [token.id]
                             : [token.id];
+
                           for (const t of tokens) {
                             if (movingIds.includes(t.id)) {
                               offsets[t.id] = {
-                                dx: t.x - pos.x,
-                                dy: t.y - pos.y,
+                                dx: t.x - world.x,
+                                dy: t.y - world.y,
                               };
                             }
                           }
 
                           setDragOffsets(offsets);
+                          setIsDraggingPlayer(true);
                         }
                       }}
                       onContextMenu={(e) => {
@@ -2464,9 +2444,6 @@ export default function GridAdaptativo() {
                 })}
             </Layer>
 
-            <Layer >
-
-            </Layer>
           </Stage>
 
           {/* Token Context Menu */}
