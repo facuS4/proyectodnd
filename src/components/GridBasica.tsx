@@ -7,7 +7,7 @@ import { DiceRoller } from "./diceroller";
 import React from "react";
 import ColorPalette from "./ColorPalette";
 import socket from "../utils/socket";
-import { Button, ButtonGroup, Popover, PopoverContent, PopoverTrigger, Tooltip, Divider } from "@heroui/react";
+import { Button, ButtonGroup, Popover, PopoverContent, PopoverTrigger, Tooltip, Divider, Textarea } from "@heroui/react";
 import { Icon } from "@iconify/react";
 
 export default function GridAdaptativo() {
@@ -150,6 +150,7 @@ export default function GridAdaptativo() {
     vida: string;
     image?: HTMLImageElement | null;
     muerto?: boolean; // Indica si el token está muerto
+    notas?: string; // Notas adicionales del token
   };
 
   // Estado para los tokens
@@ -2448,7 +2449,7 @@ export default function GridAdaptativo() {
           {contextMenuVisible && contextTokenId && (
             <div
               id="token-context-menu"
-              className="fixed bg-content1 border border-default-200 shadow-md rounded-lg p-4 z-50 w-64"
+              className="fixed bg-content1 border border-default-200 shadow-md rounded-lg p-4 z-50 w-72"
               style={{
                 top: contextMenuPosition.y,
                 left: contextMenuPosition.x,
@@ -2456,29 +2457,80 @@ export default function GridAdaptativo() {
               onContextMenu={(e) => e.preventDefault()}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Color:</label>
-                  <input
-                    type="color"
-                    className="w-full h-8 rounded cursor-pointer"
-                    value={
-                      contextTokenId
-                        ? rgbToHex(tokens.find((t) => t.id === contextTokenId)?.color || "rgb(0, 0, 0)")
-                        : "#000000"
-                    }
-                    onChange={(e) => {
-                      const newColor = hexToRgb(e.target.value);
-                      setTokens((tokens) =>
-                        tokens.map((t) =>
-                          t.id === contextTokenId ? { ...t, color: newColor } : t
-                        )
-                      );
-                      sendTokenUpdate(contextTokenId, { color: newColor });
-                    }}
-                  />
+              <div className="space-y-4">
+                {/* Color + Imagen lado a lado con espacio */}
+                <div className="flex items-center gap-3">
+                  {/* Selector de color */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">Color:</span>
+                    <input
+                      type="color"
+                      className="w-10 h-10 p-0 border border-default-300 rounded cursor-pointer"
+                      value={
+                        contextTokenId
+                          ? rgbToHex(tokens.find((t) => t.id === contextTokenId)?.color || "rgb(0, 0, 0)")
+                          : "#000000"
+                      }
+                      onChange={(e) => {
+                        const newColor = hexToRgb(e.target.value);
+                        setTokens((tokens) =>
+                          tokens.map((t) =>
+                            t.id === contextTokenId ? { ...t, color: newColor } : t
+                          )
+                        );
+                        sendTokenUpdate(contextTokenId, { color: newColor });
+                      }}
+                    />
+                  </div>
+
+                  {/* Botón de imagen */}
+                  <div>
+                    <label
+                      htmlFor="file-upload"
+                      className="cursor-pointer border border-default-300 rounded p-2 hover:bg-gray-100 transition flex items-center justify-center"
+                      title="Cambiar imagen del token"
+                    >
+                      <Icon icon="mdi:image" width={24} height={24} />
+                    </label>
+                    <input
+                      id="file-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file || !contextTokenId) return;
+
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          const base64 = reader.result as string;
+                          const img = new window.Image();
+                          img.src = base64;
+                          img.onload = () => {
+                            setTokens((tokens) =>
+                              tokens.map((t) =>
+                                t.id === contextTokenId ? { ...t, image: img } : t
+                              )
+                            );
+
+                            socket.send(
+                              JSON.stringify({
+                                type: "TOKEN_IMAGE",
+                                payload: {
+                                  id: contextTokenId,
+                                  base64,
+                                },
+                              })
+                            );
+                          };
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                  </div>
                 </div>
 
+                {/* Nombre */}
                 <div>
                   <label className="block text-sm font-medium mb-1">Nombre:</label>
                   <input
@@ -2497,6 +2549,7 @@ export default function GridAdaptativo() {
                   />
                 </div>
 
+                {/* Vida */}
                 <div>
                   <label className="block text-sm font-medium mb-1">Vida:</label>
                   <input
@@ -2514,49 +2567,38 @@ export default function GridAdaptativo() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-1">Imagen:</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-primary file:text-white hover:file:bg-primary-600"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file || !contextTokenId) return;
+                <Divider className="my-3" />
 
-                      const reader = new FileReader();
+                {/* Notas */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="bordered" className="w-full text-left">
+                      {tokens.find((t) => t.id === contextTokenId)?.notas
+                        ? "Ver/Editar Notas"
+                        : "Agregar Notas"}
+                    </Button>
+                  </PopoverTrigger>
 
-                      reader.onload = () => {
-                        const base64 = reader.result as string;
-
-                        const img = new window.Image();
-                        img.src = base64;
-                        img.onload = () => {
-                          // 🧠 1. Mostrar localmente
-                          setTokens((tokens) =>
-                            tokens.map((t) =>
-                              t.id === contextTokenId ? { ...t, image: img } : t
-                            )
-                          );
-
-                          // 📡 2. Enviar al servidor
-                          socket.send(JSON.stringify({
-                            type: "TOKEN_IMAGE",
-                            payload: {
-                              id: contextTokenId,
-                              base64
-                            }
-                          }));
-                        };
-                      };
-
-                      reader.readAsDataURL(file);
-                    }}
-                  />
-                </div>
+                  <PopoverContent className="w-80 p-4">
+                    <label className="block text-sm font-medium mb-2">Notas (solo para el DM):</label>
+                    <Textarea
+                      rows={5}
+                      value={tokens.find((t) => t.id === contextTokenId)?.notas || ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setTokens((tokens) =>
+                          tokens.map((t) =>
+                            t.id === contextTokenId ? { ...t, notas: value } : t
+                          )
+                        );
+                      }}
+                    />
+                  </PopoverContent>
+                </Popover>
 
                 <Divider className="my-3" />
 
+                {/* Eliminar */}
                 <Button
                   color="danger"
                   variant="solid"
@@ -2571,7 +2613,6 @@ export default function GridAdaptativo() {
                       type: "DELETE_TOKEN",
                       payload: { id: contextTokenId }
                     }));
-
                   }}
                 >
                   Eliminar Token
