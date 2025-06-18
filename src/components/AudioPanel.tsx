@@ -1,6 +1,7 @@
-import { useRef, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Popover, PopoverTrigger, PopoverContent, Button } from "@heroui/react";
 import AudioManager from "./AudioManager";
+import { Icon } from "@iconify/react";
 
 type Track = {
   id: string;
@@ -22,7 +23,6 @@ export default function AudioPanel({ socket }: AudioPanelProps) {
 
   const [activeTracks, setActiveTracks] = useState<Track[]>([]);
 
-  // Recibir mensajes WS para sincronizar
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const message = JSON.parse(event.data);
@@ -99,13 +99,6 @@ export default function AudioPanel({ socket }: AudioPanelProps) {
     setActiveTracks((prev) =>
       prev.map((t) => (t.id === id ? { ...t, volume } : t))
     );
-
-    socket.send(
-      JSON.stringify({
-        type: "UPDATE_AUDIO_TRACK",
-        payload: { id, volume },
-      })
-    );
   };
 
   return (
@@ -150,32 +143,51 @@ export default function AudioPanel({ socket }: AudioPanelProps) {
               backgroundColor: "#fff",
               borderRadius: 6,
               boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
             }}
           >
-            <strong>{track.name}</strong>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <AudioManager
-                src={track.src}
-                loop
-                isPlaying={track.isPlaying}
-                externalVolume={track.volume}
-                onMount={(audio) => {
-                  // No necesario aquí, el audio se controla con props
-                }}
+            <div className="flex items-center justify-between gap-4">
+              <strong>{track.name}</strong>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  color={track.isPlaying ? "warning" : "success"}
+                  variant="solid"
+                  onClick={() => togglePlay(track.id, !track.isPlaying)}
+                >
+                  <Icon icon={track.isPlaying ? "mdi:pause" : "mdi:play"} />
+                </Button>
+                <Button
+                  color="danger"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeTrack(track.id)}
+                  style={{ minWidth: 30, padding: "2px 6px" }}
+                  title="Eliminar pista"
+                >
+                  ❌
+                </Button>
+              </div>
+            </div>
+
+            <AudioManager
+              src={track.src}
+              loop
+              isPlaying={track.isPlaying}
+              externalVolume={track.volume}
+            />
+
+            <div className="mt-2 flex items-center gap-2">
+              <Icon icon="mdi:volume-low" />
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={track.volume}
+                onChange={(e) => changeVolume(track.id, parseFloat(e.target.value))}
+                className="flex-grow accent-primary"
               />
-              <Button
-                color="danger"
-                variant="ghost"
-                size="sm"
-                onClick={() => removeTrack(track.id)}
-                style={{ minWidth: 30, padding: "2px 6px" }}
-                title="Eliminar pista"
-              >
-                ❌
-              </Button>
+              <Icon icon="mdi:volume-high" />
             </div>
           </div>
         ))}

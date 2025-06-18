@@ -448,7 +448,7 @@ wss.on("connection", (ws) => {
                     // Si se quiere reproducir una pista, detener todas las demás
                     activeAudioTracks = activeAudioTracks.map((track) =>
                         track.id === id
-                            ? { ...track, isPlaying: true, volume: volume ?? track.volume }
+                            ? { ...track, isPlaying: true}
                             : { ...track, isPlaying: false }
                     );
                 } else {
@@ -457,24 +457,21 @@ wss.on("connection", (ws) => {
                         track.id === id
                             ? {
                                 ...track,
-                                isPlaying: isPlaying ?? track.isPlaying,
-                                volume: volume ?? track.volume,
+                                isPlaying: isPlaying ?? track.isPlaying
                             }
                             : track
                     );
                 }
 
                 // Enviar el estado completo a todos los clientes
-                const fullUpdate = {
-                    type: "SYNC_AUDIO_TRACKS",
-                    payload: activeAudioTracks,
-                };
+                broadcastExcept(ws, {
+                    type: "UPDATE_AUDIO_TRACK",
+                    payload: {
+                        id,
+                        isPlaying
+                    },
+                });
 
-                for (const client of clients) {
-                    if (client.readyState === WebSocket.OPEN) {
-                        client.send(JSON.stringify(fullUpdate));
-                    }
-                }
 
                 break;
             }
