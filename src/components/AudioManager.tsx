@@ -1,102 +1,155 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Popover, PopoverTrigger, PopoverContent, Button } from "@heroui/react";
+// AudioManager.tsx
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
+import { Button, Popover, PopoverTrigger, PopoverContent } from "@heroui/react";
 import { Icon } from "@iconify/react";
 
 interface AudioManagerProps {
   src: string;
-  volume?: number;       // Default: 1.0
-  autoPlay?: boolean;    // Default: false
-  loop?: boolean;        // Default: false
+  loop?: boolean;
+  /** volumen inicial cuando no llega externalVolume (0‑1) */
+  volume?: number;
+  /** si el componente padre quiere arrancar reproduciendo */
+  isPlaying?: boolean;
+  /** control externo de volumen (0‑1) */
+  externalVolume?: number;
+  /** callback opcional con la referencia al <audio> */
   onMount?: (audio: HTMLAudioElement) => void;
 }
 
-export default function AudioManager({
-  src,
-  volume = 0.5,
-  autoPlay = false,
-  loop = false,
-  onMount,
-}: AudioManagerProps) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [currentVolume, setCurrentVolume] = useState(volume);
-  const [isOpen, setIsOpen] = useState(false);
+const AudioManager = forwardRef<HTMLAudioElement, AudioManagerProps>(
+  (
+    {
+      src,
+      loop = false,
+      volume = 0.5,
+      isPlaying = false,
+      externalVolume,
+      onMount,
+    },
+    ref,
+  ) => {
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const [currentVolume, setCurrentVolume] = useState<number>(
+      externalVolume ?? volume,
+    );
+    const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    if (!audioRef.current) {
-      const audio = new Audio(src);
-      audio.volume = volume;
-      audio.loop = loop;
-      if (autoPlay) audio.play();
+    /* -------- exposición del <audio> al padre ---------- */
+    useImperativeHandle(ref, () => audioRef.current as HTMLAudioElement, []);
 
-      audioRef.current = audio;
+    /* -------- al montar: llamar onMount ------------ */
+    useEffect(() => {
+      if (audioRef.current && onMount) onMount(audioRef.current);
+    }, [onMount]);
 
-      if (onMount) onMount(audio);
-    }
+    /* -------- sincronizar props -> elemento <audio> -------- */
+    useEffect(() => {
+      if (!audioRef.current) return;
 
-    return () => {
-      if (audioRef.current) {
+      // src / loop sólo cambian cuando el track se reemplaza
+      audioRef.current.src = src;
+      audioRef.current.loop = loop;
+
+      // reproducir / pausar
+      if (isPlaying) {
+        audioRef.current.play().catch((err) => {
+          // El navegador puede bloquear autoplay; lo ignoramos.
+          console.warn("play() bloqueado:", err);
+        });
+      } else {
         audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-        audioRef.current = null;
       }
+    }, [src, loop, isPlaying]);
+
+    /* -------- volumen externo -------- */
+    useEffect(() => {
+      if (audioRef.current && externalVolume !== undefined) {
+        audioRef.current.volume = externalVolume;
+        setCurrentVolume(externalVolume);
+      }
+    }, [externalVolume]);
+
+    /* -------- handlers UI internos -------- */
+    const handlePlay = () => audioRef.current?.play();
+    const handlePause = () => audioRef.current?.pause();
+
+    const handleSlider = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const v = parseFloat(e.target.value);
+      setCurrentVolume(v);
+      if (audioRef.current) audioRef.current.volume = v;
     };
-  }, [src, volume, autoPlay, loop, onMount]);
 
-  const handlePlay = () => {
-    audioRef.current?.play();
-  };
+    /* -------- JSX -------- */
+    return (
+      <>
+        {/* el audio REAL que sonará */}
+        <audio
+          ref={audioRef}
+          style={{ display: "none" }}
+          // src y loop se vuelven a fijar en el efecto pero
+          // los ponemos también aquí para el primer render.
+          src={src}
+          loop={loop}
+          // importantísimo: sin controles para no renderizar el UI nativo
+        />
 
-  const handlePause = () => {
-    audioRef.current?.pause();
-  };
+        {/* control UI */}
+        <Popover isOpen={open} onOpenChange={setOpen} placement="bottom">
+          <PopoverTrigger>
+            <Button
+              variant="bordered"
+              color="default"
+              className="flex items-center gap-1"
+              startContent={<Icon icon="mdi:volume-high" />}
+            >
+              Audio
+            </Button>
+          </PopoverTrigger>
 
-  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newVolume = parseFloat(e.target.value);
-    setCurrentVolume(newVolume);
-    if (audioRef.current) audioRef.current.volume = newVolume;
-  };
+          <PopoverContent className="w-64 p-4 flex flex-col gap-4">
+            <div className="flex items-center gap-2 justify-between">
+              <Button
+                size="sm"
+                color="success"
+                variant="solid"
+                onClick={handlePlay}
+              >
+                <Icon icon="mdi:play" />
+              </Button>
+              <Button
+                size="sm"
+                color="warning"
+                variant="solid"
+                onClick={handlePause}
+              >
+                <Icon icon="mdi:pause" />
+              </Button>
+            </div>
 
-  return (
-    <Popover isOpen={isOpen} onOpenChange={setIsOpen} placement="bottom">
-      <PopoverTrigger>
-        <Button
-          color="default"
-          variant="bordered"
-          className="flex items-center gap-2"
-          startContent={<Icon icon="mdi:volume-high" />}
-        >
-          Audio
-        </Button>
-      </PopoverTrigger>
+            <div className="flex items-center gap-3">
+              <Icon icon="mdi:volume-low" />
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={currentVolume}
+                onChange={handleSlider}
+                className="flex-grow accent-primary"
+              />
+              <Icon icon="mdi:volume-high" />
+            </div>
+          </PopoverContent>
+        </Popover>
+      </>
+    );
+  },
+);
 
-      <PopoverContent className="p-4 w-64 flex flex-col gap-3">
-        <div className="flex justify-between items-center">
-          <button
-            onClick={handlePlay}
-            className="px-3 py-1 rounded border bg-green-500 text-white hover:bg-green-600 transition"
-          >
-            ▶️ Reproducir
-          </button>
-          <button
-            onClick={handlePause}
-            className="px-3 py-1 rounded border bg-yellow-400 text-black hover:bg-yellow-500 transition"
-          >
-            ⏸ Pausar
-          </button>
-        </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={currentVolume}
-            onChange={handleVolumeChange}
-            className="flex-grow"
-          />
-          <span>{Math.round(currentVolume * 100)}%</span>
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
+export default AudioManager;

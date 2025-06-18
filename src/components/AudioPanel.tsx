@@ -1,32 +1,111 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Popover, PopoverTrigger, PopoverContent, Button } from "@heroui/react";
 import AudioManager from "./AudioManager";
 
-export default function AudioPanel() {
+type Track = {
+  id: string;
+  name: string;
+  src: string;
+  isPlaying: boolean;
+  volume: number;
+};
+
+type AudioPanelProps = {
+  socket: WebSocket;
+};
+
+export default function AudioPanel({ socket }: AudioPanelProps) {
   const availableTracks = [
     { name: "Rain", src: "/music/rain.mp3" },
     { name: "Wind", src: "/music/wind.mp3" },
   ];
 
-  const [activeTracks, setActiveTracks] = useState<
-    { id: string; name: string; src: string }[]
-  >([]);
+  const [activeTracks, setActiveTracks] = useState<Track[]>([]);
 
-  const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
+  // Recibir mensajes WS para sincronizar
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const message = JSON.parse(event.data);
+
+      if (message.type === "INIT_AUDIO_TRACKS") {
+        setActiveTracks(message.payload);
+      }
+
+      if (message.type === "UPDATE_AUDIO_TRACK") {
+        setActiveTracks((prev) =>
+          prev.map((t) =>
+            t.id === message.payload.id ? { ...t, ...message.payload } : t
+          )
+        );
+      }
+
+      if (message.type === "ADD_AUDIO_TRACK") {
+        setActiveTracks((prev) => [...prev, message.payload]);
+      }
+
+      if (message.type === "REMOVE_AUDIO_TRACK") {
+        setActiveTracks((prev) => prev.filter((t) => t.id !== message.payload.id));
+      }
+    };
+
+    socket.addEventListener("message", handleMessage);
+    return () => socket.removeEventListener("message", handleMessage);
+  }, [socket]);
 
   const addTrack = (track: { name: string; src: string }) => {
     const id = crypto.randomUUID();
-    setActiveTracks((prev) => [...prev, { ...track, id }]);
+    const newTrack: Track = {
+      id,
+      name: track.name,
+      src: track.src,
+      isPlaying: false,
+      volume: 0.5,
+    };
+    setActiveTracks((prev) => [...prev, newTrack]);
+
+    socket.send(
+      JSON.stringify({
+        type: "ADD_AUDIO_TRACK",
+        payload: newTrack,
+      })
+    );
   };
 
   const removeTrack = (id: string) => {
-    const audio = audioRefs.current.get(id);
-    if (audio) {
-      audio.pause();
-      audio.currentTime = 0;
-      audioRefs.current.delete(id);
-    }
     setActiveTracks((prev) => prev.filter((t) => t.id !== id));
+
+    socket.send(
+      JSON.stringify({
+        type: "REMOVE_AUDIO_TRACK",
+        payload: { id },
+      })
+    );
+  };
+
+  const togglePlay = (id: string, play: boolean) => {
+    setActiveTracks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, isPlaying: play } : t))
+    );
+
+    socket.send(
+      JSON.stringify({
+        type: "UPDATE_AUDIO_TRACK",
+        payload: { id, isPlaying: play },
+      })
+    );
+  };
+
+  const changeVolume = (id: string, volume: number) => {
+    setActiveTracks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, volume } : t))
+    );
+
+    socket.send(
+      JSON.stringify({
+        type: "UPDATE_AUDIO_TRACK",
+        payload: { id, volume },
+      })
+    );
   };
 
   return (
@@ -81,8 +160,10 @@ export default function AudioPanel() {
               <AudioManager
                 src={track.src}
                 loop
+                isPlaying={track.isPlaying}
+                externalVolume={track.volume}
                 onMount={(audio) => {
-                  audioRefs.current.set(track.id, audio);
+                  // No necesario aquí, el audio se controla con props
                 }}
               />
               <Button

@@ -55,11 +55,38 @@ let imageShapes: Record<string, {
     height: number;
 }> = {};
 
+// Estado musica
+type Track = {
+    id: string;
+    name: string;
+    src: string;
+    isPlaying: boolean;
+    volume: number;
+};
 
+let activeAudioTracks: Track[] = [];
+
+function broadcastExcept(sender: WebSocket, msg: any) {
+    const raw = JSON.stringify(msg);
+    wss.clients.forEach((client) => {
+        if (client !== sender && client.readyState === client.OPEN) {
+            client.send(raw);
+        }
+    });
+}
 
 
 wss.on("connection", (ws) => {
     clients.add(ws);
+
+    // Musica
+    ws.send(
+        JSON.stringify({
+            type: "INIT_AUDIO_TRACKS",
+            payload: activeAudioTracks,
+        })
+    );
+
 
     // Enviar estado inicial de tiles 
     ws.send(
@@ -390,12 +417,75 @@ wss.on("connection", (ws) => {
             return; // evitar broadcast duplicado
         }
 
+        // Musica
+        switch (message.type) {
+            case "ADD_AUDIO_TRACK": {
+                const newTrack = message.payload;
+                activeAudioTracks.push(newTrack);
 
+                broadcastExcept(ws, {
+                    type: "ADD_AUDIO_TRACK",
+                    payload: newTrack,
+                });
+                break;
+            }
 
-        // Broadcast
-        for (const client of clients) {
-            if (client !== ws && client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify(message));
+            case "REMOVE_AUDIO_TRACK": {
+                const { id } = message.payload;
+                activeAudioTracks = activeAudioTracks.filter((t) => t.id !== id);
+
+                broadcastExcept(ws, {
+                    type: "REMOVE_AUDIO_TRACK",
+                    payload: { id },
+                });
+                break;
+            }
+
+            case "UPDATE_AUDIO_TRACK": {
+                const { id, isPlaying, volume } = message.payload;
+
+                if (isPlaying === true) {
+                    // Si se quiere reproducir una pista, detener todas las demás
+                    activeAudioTracks = activeAudioTracks.map((track) =>
+                        track.id === id
+                            ? { ...track, isPlaying: true, volume: volume ?? track.volume }
+                            : { ...track, isPlaying: false }
+                    );
+                } else {
+                    // Si se está pausando una pista o actualizando solo el volumen
+                    activeAudioTracks = activeAudioTracks.map((track) =>
+                        track.id === id
+                            ? {
+                                ...track,
+                                isPlaying: isPlaying ?? track.isPlaying,
+                                volume: volume ?? track.volume,
+                            }
+                            : track
+                    );
+                }
+
+                // Enviar el estado completo a todos los clientes
+                const fullUpdate = {
+                    type: "SYNC_AUDIO_TRACKS",
+                    payload: activeAudioTracks,
+                };
+
+                for (const client of clients) {
+                    if (client.readyState === WebSocket.OPEN) {
+                        client.send(JSON.stringify(fullUpdate));
+                    }
+                }
+
+                break;
+            }
+            default: {
+                // Broadcast
+                for (const client of clients) {
+                    if (client !== ws && client.readyState === WebSocket.OPEN) {
+                        client.send(JSON.stringify(message));
+                    }
+                }
+                break;
             }
         }
     });

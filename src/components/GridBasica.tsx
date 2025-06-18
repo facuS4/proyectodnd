@@ -1380,7 +1380,7 @@ export default function GridAdaptativo() {
 
             {/* Audio Panel */}
             <div className="flex items-center">
-              <AudioPanel />
+              <AudioPanel socket={socket} />
             </div>
 
             {/* Hidden Image Upload */}
