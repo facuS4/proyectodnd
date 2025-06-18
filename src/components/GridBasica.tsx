@@ -1764,7 +1764,7 @@ export default function GridAdaptativo() {
               }
             }}
             onDragEnd={(e) => {
-              const pos = e.target.position();
+              const pos = getWorldPos();
               setStagePosition(pos);
             }}
             onMouseDown={(e) => {
@@ -1782,7 +1782,7 @@ export default function GridAdaptativo() {
               handleClickStage(e);
 
               if (isPlacingFog) {
-                const pos = e.target.getStage()?.getPointerPosition();
+                const pos = getWorldPos();
                 if (pos) setFogStart(pos);
               }
             }}
@@ -1804,7 +1804,7 @@ export default function GridAdaptativo() {
               handleMouseMovePlayer(e);
 
               if (isPlacingFog) {
-                const pos = e.target.getStage()?.getPointerPosition();
+                const pos = getWorldPos();
                 if (pos) setCurrentMousePos(pos);
               }
             }}
@@ -2198,7 +2198,7 @@ export default function GridAdaptativo() {
                       onMouseDown={(e) => {
                         if (moveMode) {
                           const stage = e.target.getStage();
-                          const pos = stage?.getPointerPosition();
+                          const pos = getWorldPos();
                           const offsets: { [id: string]: { dx: number; dy: number } } = {};
                           if (!pos) return;
 
