@@ -13,44 +13,18 @@ type Track = {
 
 type AudioPanelProps = {
   socket: WebSocket;
+  tracks: Track[];
+  setTracks: React.Dispatch<React.SetStateAction<Track[]>>;
 };
 
-export default function AudioPanel({ socket }: AudioPanelProps) {
+export default function AudioPanel({ socket, tracks, setTracks }: AudioPanelProps) {
   const availableTracks = [
     { name: "Rain", src: "/music/rain.mp3" },
     { name: "Wind", src: "/music/wind.mp3" },
   ];
 
-  const [activeTracks, setActiveTracks] = useState<Track[]>([]);
-
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      const message = JSON.parse(event.data);
-
-      if (message.type === "INIT_AUDIO_TRACKS") {
-        setActiveTracks(message.payload);
-      }
-
-      if (message.type === "UPDATE_AUDIO_TRACK") {
-        setActiveTracks((prev) =>
-          prev.map((t) =>
-            t.id === message.payload.id ? { ...t, ...message.payload } : t
-          )
-        );
-      }
-
-      if (message.type === "ADD_AUDIO_TRACK") {
-        setActiveTracks((prev) => [...prev, message.payload]);
-      }
-
-      if (message.type === "REMOVE_AUDIO_TRACK") {
-        setActiveTracks((prev) => prev.filter((t) => t.id !== message.payload.id));
-      }
-    };
-
-    socket.addEventListener("message", handleMessage);
-    return () => socket.removeEventListener("message", handleMessage);
-  }, [socket]);
+const activeTracks = tracks;
+const setActiveTracks = setTracks;
 
   const addTrack = (track: { name: string; src: string }) => {
     const id = crypto.randomUUID();
@@ -61,7 +35,6 @@ export default function AudioPanel({ socket }: AudioPanelProps) {
       isPlaying: false,
       volume: 0.5,
     };
-    setActiveTracks((prev) => [...prev, newTrack]);
 
     socket.send(
       JSON.stringify({
@@ -72,8 +45,6 @@ export default function AudioPanel({ socket }: AudioPanelProps) {
   };
 
   const removeTrack = (id: string) => {
-    setActiveTracks((prev) => prev.filter((t) => t.id !== id));
-
     socket.send(
       JSON.stringify({
         type: "REMOVE_AUDIO_TRACK",
@@ -83,10 +54,6 @@ export default function AudioPanel({ socket }: AudioPanelProps) {
   };
 
   const togglePlay = (id: string, play: boolean) => {
-    setActiveTracks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, isPlaying: play } : t))
-    );
-
     socket.send(
       JSON.stringify({
         type: "UPDATE_AUDIO_TRACK",
@@ -168,13 +135,6 @@ export default function AudioPanel({ socket }: AudioPanelProps) {
                 </Button>
               </div>
             </div>
-
-            <AudioManager
-              src={track.src}
-              loop
-              isPlaying={track.isPlaying}
-              externalVolume={track.volume}
-            />
 
             <div className="mt-2 flex items-center gap-2">
               <Icon icon="mdi:volume-low" />

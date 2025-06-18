@@ -3,6 +3,7 @@ import { useRef, useState, useEffect } from "react";
 import { Circle, Text, Transformer } from "react-konva";
 import CircularToken from "./CircularTokenProps";
 import AudioPanel from "./AudioPanel";
+import AudioManager from "./AudioManager";
 import { DiceRoller } from "./diceroller";
 import React from "react";
 import ColorPalette from "./ColorPalette";
@@ -1109,6 +1110,10 @@ export default function GridAdaptativo() {
             setFoggedTiles(new Set(data.payload));
             break;
 
+          case "INIT_AUDIO_TRACKS":
+            setGlobalAudioTracks(data.payload);
+            break;
+
           case "PAINT_TILE":
             const { x, y, color } = data.payload;
             setPaintedTiles((prev) => {
@@ -1352,6 +1357,27 @@ export default function GridAdaptativo() {
             );
             break;
           }
+
+          case "ADD_AUDIO_TRACK":
+            setGlobalAudioTracks((prev) => {
+              if (prev.some((t) => t.id === data.payload.id)) return prev;
+              return [...prev, data.payload];
+            });
+            break;
+
+          case "REMOVE_AUDIO_TRACK":
+            setGlobalAudioTracks((prev) =>
+              prev.filter((t) => t.id !== data.payload.id)
+            );
+            break;
+
+          case "UPDATE_AUDIO_TRACK":
+            setGlobalAudioTracks((prev) =>
+              prev.map((t) =>
+                t.id === data.payload.id ? { ...t, ...data.payload } : t
+              )
+            );
+            break;
         }
 
       } catch (err) {
@@ -1361,6 +1387,22 @@ export default function GridAdaptativo() {
   }, []);
 
   //#endregion
+
+  //#region AUDIO
+
+  const [globalAudioTracks, setGlobalAudioTracks] = useState<Track[]>([]);
+
+  type Track = {
+    id: string;
+    name: string;
+    src: string;
+    isPlaying: boolean;
+    volume: number;
+  };
+
+
+  //#endregion
+
 
   return (
     <div className="flex flex-col h-screen bg-content1">
@@ -1380,7 +1422,11 @@ export default function GridAdaptativo() {
 
             {/* Audio Panel */}
             <div className="flex items-center">
-              <AudioPanel socket={socket} />
+              <AudioPanel
+                socket={socket}
+                tracks={globalAudioTracks}
+                setTracks={setGlobalAudioTracks}
+              />
             </div>
 
             {/* Hidden Image Upload */}
@@ -1485,6 +1531,16 @@ export default function GridAdaptativo() {
           </div>
         </>
       )}
+
+      {globalAudioTracks.map((track) => (
+        <AudioManager
+          key={track.id}
+          src={track.src}
+          loop
+          isPlaying={track.isPlaying}
+          externalVolume={track.volume}
+        />
+      ))}
 
 
       {/* Tool Buttons Row - Moved from sides to top */}
@@ -1791,6 +1847,9 @@ export default function GridAdaptativo() {
             }}
             tabIndex={0}
           >
+
+
+
             <Layer>
               {imageShapes.map((shape) => (
                 <Rect

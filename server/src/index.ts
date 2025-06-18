@@ -418,12 +418,21 @@ wss.on("connection", (ws) => {
         }
 
         // Musica
+
+        function broadcast(data: any) {
+            for (const client of clients) {
+                if (client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify(data));
+                }
+            }
+        }
+
         switch (message.type) {
             case "ADD_AUDIO_TRACK": {
                 const newTrack = message.payload;
                 activeAudioTracks.push(newTrack);
 
-                broadcastExcept(ws, {
+                broadcast({
                     type: "ADD_AUDIO_TRACK",
                     payload: newTrack,
                 });
@@ -434,7 +443,7 @@ wss.on("connection", (ws) => {
                 const { id } = message.payload;
                 activeAudioTracks = activeAudioTracks.filter((t) => t.id !== id);
 
-                broadcastExcept(ws, {
+                broadcast({
                     type: "REMOVE_AUDIO_TRACK",
                     payload: { id },
                 });
@@ -448,7 +457,7 @@ wss.on("connection", (ws) => {
                     // Si se quiere reproducir una pista, detener todas las demás
                     activeAudioTracks = activeAudioTracks.map((track) =>
                         track.id === id
-                            ? { ...track, isPlaying: true}
+                            ? { ...track, isPlaying: true }
                             : { ...track, isPlaying: false }
                     );
                 } else {
@@ -463,15 +472,13 @@ wss.on("connection", (ws) => {
                     );
                 }
 
-                // Enviar el estado completo a todos los clientes
-                broadcastExcept(ws, {
+                broadcast({
                     type: "UPDATE_AUDIO_TRACK",
                     payload: {
                         id,
                         isPlaying
                     },
                 });
-
 
                 break;
             }
