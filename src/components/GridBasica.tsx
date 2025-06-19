@@ -1420,14 +1420,6 @@ export default function GridAdaptativo() {
               />
             </div>
 
-            {/* Audio Panel */}
-            <div className="flex items-center">
-              <AudioPanel
-                socket={socket}
-                tracks={globalAudioTracks}
-                setTracks={setGlobalAudioTracks}
-              />
-            </div>
 
             {/* Hidden Image Upload */}
             <input
@@ -1658,6 +1650,16 @@ export default function GridAdaptativo() {
                 />
               </PopoverContent>
             </Popover>
+
+            {/* Audio Panel */}
+            <div className="flex items-center">
+              <AudioPanel
+                socket={socket}
+                tracks={globalAudioTracks}
+                setTracks={setGlobalAudioTracks}
+                isDmMode={isDmMode}
+              />
+            </div>
           </ButtonGroup>
 
           <Button

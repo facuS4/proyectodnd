@@ -15,16 +15,17 @@ type AudioPanelProps = {
   socket: WebSocket;
   tracks: Track[];
   setTracks: React.Dispatch<React.SetStateAction<Track[]>>;
+  isDmMode?: boolean;
 };
 
-export default function AudioPanel({ socket, tracks, setTracks }: AudioPanelProps) {
+export default function AudioPanel({ socket, tracks, setTracks, isDmMode }: AudioPanelProps) {
   const availableTracks = [
     { name: "Rain", src: "/music/rain.mp3" },
     { name: "Wind", src: "/music/wind.mp3" },
   ];
 
-const activeTracks = tracks;
-const setActiveTracks = setTracks;
+  const activeTracks = tracks;
+  const setActiveTracks = setTracks;
 
   const addTrack = (track: { name: string; src: string }) => {
     const id = crypto.randomUUID();
@@ -82,20 +83,25 @@ const setActiveTracks = setTracks;
       </PopoverTrigger>
 
       <PopoverContent className="p-4 w-80 max-w-full" style={{ maxHeight: 400, overflowY: "auto" }}>
-        <h3 style={{ marginBottom: 8 }}>🎵 Pistas Disponibles</h3>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-          {availableTracks.map((track) => (
-            <Button
-              key={track.name}
-              onClick={() => addTrack(track)}
-              variant="light"
-              size="sm"
-              style={{ flex: "1 1 45%" }}
-            >
-              Agregar: {track.name}
-            </Button>
-          ))}
-        </div>
+        {isDmMode && (
+          <>
+            <h3 style={{ marginBottom: 8 }}>🎵 Pistas Disponibles</h3>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+              {availableTracks.map((track) => (
+                <Button
+                  key={track.name}
+                  onClick={() => addTrack(track)}
+                  variant="light"
+                  size="sm"
+                  style={{ flex: "1 1 45%" }}
+                >
+                  Agregar: {track.name}
+                </Button>
+              ))}
+            </div>
+            <hr style={{ margin: "12px 0" }} />
+          </>
+        )}
 
         <hr style={{ margin: "12px 0" }} />
 
@@ -115,24 +121,28 @@ const setActiveTracks = setTracks;
             <div className="flex items-center justify-between gap-4">
               <strong>{track.name}</strong>
               <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  color={track.isPlaying ? "warning" : "success"}
-                  variant="solid"
-                  onClick={() => togglePlay(track.id, !track.isPlaying)}
-                >
-                  <Icon icon={track.isPlaying ? "mdi:pause" : "mdi:play"} />
-                </Button>
-                <Button
-                  color="danger"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeTrack(track.id)}
-                  style={{ minWidth: 30, padding: "2px 6px" }}
-                  title="Eliminar pista"
-                >
-                  ❌
-                </Button>
+                {isDmMode && (
+                  <Button
+                    size="sm"
+                    color={track.isPlaying ? "warning" : "success"}
+                    variant="solid"
+                    onClick={() => togglePlay(track.id, !track.isPlaying)}
+                  >
+                    <Icon icon={track.isPlaying ? "mdi:pause" : "mdi:play"} />
+                  </Button>
+                )}
+                {isDmMode && (
+                  <Button
+                    color="danger"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeTrack(track.id)}
+                    style={{ minWidth: 30, padding: "2px 6px" }}
+                    title="Eliminar pista"
+                  >
+                    ❌
+                  </Button>
+                )}
               </div>
             </div>
 
