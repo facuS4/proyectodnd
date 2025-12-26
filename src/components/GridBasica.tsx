@@ -545,7 +545,7 @@ export default function GridAdaptativo() {
   const transformerRef = useRef<any>(null);
   const shapeRefs = useRef<Map<string, any>>(new Map());
   const [isDraggingNode, setIsDraggingNode] = useState(false);
-  const [clickedOnInteractiveNode, setClickedOnInteractiveNode] = useState(false);
+  const [_clickedOnInteractiveNode, _setClickedOnInteractiveNode] = useState(false);
 
   type AreaShape = {
     id: string;
@@ -642,7 +642,7 @@ export default function GridAdaptativo() {
   }, []);
 
   // Movimiento con mouse
-  const handleMouseMovePlayer = (e: any) => {
+  const handleMouseMovePlayer = (_e: any) => {
     if (!moveMode || !isDraggingPlayer || Object.keys(dragOffsets).length === 0) return;
 
     const world = getWorldPos();
@@ -675,7 +675,7 @@ export default function GridAdaptativo() {
   };
 
   // Manejo de eventos del mouse
-  const handleMouseDown = (e: any) => {
+  const handleMouseDown = (_e: any) => {
     if (isPlacingFog) {
       requestAnimationFrame(() => {
         const world = getWorldPos();
@@ -1765,7 +1765,7 @@ export default function GridAdaptativo() {
                 }
               }
             }}
-            onDragEnd={(e) => {
+            onDragEnd={(_e) => {
               const pos = getWorldPos();
               setStagePosition(pos);
             }}
@@ -2197,26 +2197,30 @@ export default function GridAdaptativo() {
                           ? 2
                           : 0
                       }
-                      onMouseDown={(e) => {
+                      onMouseDown={(_e) => {
                         if (moveMode) {
-                          const stage = e.target.getStage();
                           const pos = getWorldPos();
                           const offsets: { [id: string]: { dx: number; dy: number } } = {};
                           if (!pos) return;
 
                           setSelectedTokenId(token.id);
-                          if (multiSelectedIds.length > 1 || (multiSelectedIds.length === 1 && multiSelectedIds[0] !== token.id)) {
+
+                          if (
+                            multiSelectedIds.length > 1 ||
+                            (multiSelectedIds.length === 1 && multiSelectedIds[0] !== token.id)
+                          ) {
                             setMultiSelectedIds([token.id]);
                           }
+
                           setIsDraggingPlayer(true);
-                          setDragOffsets(offsets);
 
                           // Obtener tokens a mover (el seleccionado o todos los múltiples)
-                          const movingIds = multiSelectedIds.length > 0
-                            ? multiSelectedIds.includes(token.id)
-                              ? multiSelectedIds
-                              : [token.id]
-                            : [token.id];
+                          const movingIds =
+                            multiSelectedIds.length > 0
+                              ? multiSelectedIds.includes(token.id)
+                                ? multiSelectedIds
+                                : [token.id]
+                              : [token.id];
 
                           for (const t of tokens) {
                             if (movingIds.includes(t.id)) {
@@ -2230,6 +2234,7 @@ export default function GridAdaptativo() {
                           setDragOffsets(offsets);
                         }
                       }}
+
                       onContextMenu={(e) => {
                         if (!isDmMode) return;
                         e.evt.preventDefault();

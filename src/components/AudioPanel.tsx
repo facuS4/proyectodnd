@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+//import { useState, useEffect } from "react";
 import { Popover, PopoverTrigger, PopoverContent, Button } from "@heroui/react";
-import AudioManager from "./AudioManager";
+//import AudioManager from "./AudioManager";
 import { Icon } from "@iconify/react";
 
 type Track = {
