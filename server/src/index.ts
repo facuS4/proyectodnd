@@ -76,7 +76,6 @@ function broadcastExcept(sender: WebSocket, msg: any) {
 }
 
 
-
 wss.on("connection", (ws) => {
     clients.add(ws);
 
@@ -418,6 +417,12 @@ wss.on("connection", (ws) => {
             return; // evitar broadcast duplicado
         }
 
+            setInterval(() => {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: "PING" }));
+                }
+            }, 30000);
+
         // Musica
 
         function broadcast(data: any) {
@@ -495,11 +500,7 @@ wss.on("connection", (ws) => {
         }
     });
 
-    setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: "ping" }));
-        }
-    }, 30000);
+
 
     ws.on("close", () => {
         clients.delete(ws);

@@ -173,17 +173,6 @@ export default function GridAdaptativo() {
   // Token Muerto
   const [deadTokenIds, setDeadTokenIds] = useState<string[]>([]);
 
-  // Request para que funcione websockets
-  useEffect(() => {
-  const interval = setInterval(() => {
-    fetch("https://proyectodnd-5qy9.onrender.com/ping")
-      .catch(() => {});
-  }, 60000); // cada 60s
-
-  return () => clearInterval(interval);
-}, []);
-
-
 
   //Cerrar el menú del token
   useEffect(() => {
@@ -1388,6 +1377,10 @@ export default function GridAdaptativo() {
                 t.id === data.payload.id ? { ...t, ...data.payload } : t
               )
             );
+            break;
+
+          case "PING" :
+            socket.send(JSON.stringify({ type: "PONG" }));
             break;
         }
 
