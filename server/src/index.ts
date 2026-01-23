@@ -87,6 +87,12 @@ wss.on("connection", (ws) => {
         })
     );
 
+    setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "PING" }));
+        }
+    }, 30000);
+
 
     // Enviar estado inicial de tiles 
     ws.send(
@@ -417,11 +423,6 @@ wss.on("connection", (ws) => {
             return; // evitar broadcast duplicado
         }
 
-            setInterval(() => {
-                if (ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: "PING" }));
-                }
-            }, 30000);
 
         // Musica
 
