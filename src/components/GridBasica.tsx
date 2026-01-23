@@ -1380,7 +1380,7 @@ export default function GridAdaptativo() {
             break;
 
           case "PING" :
-            socket.send(JSON.stringify({ type: "PONG" }));
+            console.log("PING recibido del servidor");
             break;
         }
 
